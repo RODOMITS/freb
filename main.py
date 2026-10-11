@@ -1,0 +1,35 @@
+"""Bothost entrypoint: bot, Mini App and API run in one process."""
+import os
+import secrets
+from pathlib import Path
+
+import uvicorn
+
+
+def configure(root):
+    env_file=root/'.env'
+    if env_file.exists():
+        for line in env_file.read_text(encoding='utf-8-sig').splitlines():
+            line=line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key,value=line.split('=',1)
+                os.environ.setdefault(key.strip(),value.strip().strip('"').strip("'"))
+    database=Path(os.getenv('DATABASE_PATH',str(root/'data/freebie.sqlite3')))
+    database.parent.mkdir(parents=True,exist_ok=True)
+    os.environ.setdefault('DATABASE_PATH',str(database))
+    if not os.getenv('WEBHOOK_SECRET'):
+        secret_file=database.parent/'.webhook-secret'
+        if not secret_file.exists():
+            secret_file.write_text(secrets.token_urlsafe(32),encoding='utf-8')
+            secret_file.chmod(0o600)
+        os.environ['WEBHOOK_SECRET']=secret_file.read_text(encoding='utf-8').strip()
+    os.environ.setdefault('AUTO_SETUP_TELEGRAM','true')
+    if not os.getenv('BOT_TOKEN'):
+        print('BOT_TOKEN is not configured: Telegram login and purchases are disabled.')
+    elif not os.getenv('PUBLIC_URL','').startswith('https://'):
+        raise SystemExit('Set PUBLIC_URL to the HTTPS domain shown in Bothost.')
+
+
+if __name__=='__main__':
+    configure(Path(__file__).resolve().parent)
+    uvicorn.run('backend.app:app',host='0.0.0.0',port=int(os.getenv('PORT','8000')),workers=1,proxy_headers=True,forwarded_allow_ips=os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'))

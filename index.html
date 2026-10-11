@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#100f1b">
+  <meta name="description" content="Brainrot Freebie — кейсы, апгрейдер и инвентарь брейнротов.">
+  <title>Brainrot Freebie</title>
+  <link rel="icon" href="img/logotype.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="app-shell">
+    <header class="header">
+      <a href="#cases" class="brand" aria-label="Brainrot Freebie — главная"><img class="brand-logo" src="img/logotype.png" alt=""><span>Brainrot <strong>Freebie</strong></span></a>
+      <div class="header-right"><button id="sound-toggle" class="sound-toggle" data-action="sound" aria-label="Выключить звук" aria-pressed="true"></button><button class="balance" data-action="balance" aria-label="Баланс и пополнение"><span class="coin">✦</span><span id="balance">500</span><span class="balance-unit">BStars</span><span class="balance-add">+</span></button></div>
+    </header>
+    <main id="main" tabindex="-1"></main>
+  </div>
+  <nav class="bottom-nav" aria-label="Основные вкладки"><a href="#cases" data-tab="cases"><span class="nav-icon" data-icon="box"></span><span>Кейсы</span></a><a href="#upgrade" data-tab="upgrade"><span class="nav-icon" data-icon="upgrade"></span><span>Апгрейдер</span></a><a href="#slots" data-tab="slots"><span class="nav-icon" data-icon="slots"></span><span>Слоты</span></a><a href="#mines" data-tab="mines"><span class="nav-icon" data-icon="mines"></span><span>Мины</span></a><a href="#rocket" data-tab="rocket"><span class="nav-icon" data-icon="rocket"></span><span>Ракетка</span></a><a href="#profile" data-tab="profile"><span class="nav-icon" data-icon="user"></span><span>Профиль</span></a></nav>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="modal"><div id="modal-body"></div><button class="modal-close" data-action="close-modal" aria-label="Закрыть">×</button></dialog>
+  <noscript>Для работы сайта включите JavaScript.</noscript>
+</body>
+</html>
+
+
+

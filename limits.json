@@ -1,0 +1,10 @@
+{
+  "max_stake": 1000,
+  "max_payout": 10000,
+  "max_open_risk": 100000,
+  "rocket_round_stake": 1000,
+  "daily_bonus_budget": 1000,
+  "withdraw_request_max": 10000,
+  "withdraw_user_daily": 10000,
+  "stars_hold_hours": 504
+}

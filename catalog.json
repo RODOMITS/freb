@@ -1,0 +1,300 @@
+{
+  "items": [
+    {
+      "id": "67",
+      "name": "67",
+      "value": 3,
+      "rarity": "common",
+      "image": "img/brainrots/67.webp"
+    },
+    {
+      "id": "lagrand",
+      "name": "La Grande Combinasione",
+      "value": 7,
+      "rarity": "common",
+      "image": "img/brainrots/lagrand.webp"
+    },
+    {
+      "id": "bananito",
+      "name": "Bananito",
+      "value": 9,
+      "rarity": "common",
+      "image": "img/brainrots/bananito.webp"
+    },
+    {
+      "id": "esok",
+      "name": "Esok Sekolah",
+      "value": 15,
+      "rarity": "common",
+      "image": "img/brainrots/esok.webp"
+    },
+    {
+      "id": "ketupat",
+      "name": "Ketupat Kepat",
+      "value": 25,
+      "rarity": "rare",
+      "image": "img/brainrots/ketupat.webp"
+    },
+    {
+      "id": "tictac",
+      "name": "Tictac Sahur",
+      "value": 42,
+      "rarity": "rare",
+      "image": "img/brainrots/tictac.webp"
+    },
+    {
+      "id": "lavadorito",
+      "name": "Lavadorito Spinito",
+      "value": 60,
+      "rarity": "rare",
+      "image": "img/brainrots/lavadorito.webp"
+    },
+    {
+      "id": "garama",
+      "name": "Garama and Madundung",
+      "value": 72,
+      "rarity": "rare",
+      "image": "img/brainrots/garama.webp"
+    },
+    {
+      "id": "eviledon",
+      "name": "Eviledon",
+      "value": 85,
+      "rarity": "epic",
+      "image": "img/brainrots/eviledon.webp"
+    },
+    {
+      "id": "cash",
+      "name": "Cash or Card",
+      "value": 146,
+      "rarity": "epic",
+      "image": "img/brainrots/cash.webp"
+    },
+    {
+      "id": "pizza",
+      "name": "Pizza and Ranch",
+      "value": 154,
+      "rarity": "epic",
+      "image": "img/brainrots/pizza.webp"
+    },
+    {
+      "id": "burguro",
+      "name": "Burguro and Fryuro",
+      "value": 171,
+      "rarity": "epic",
+      "image": "img/brainrots/burguro.webp"
+    },
+    {
+      "id": "capitano",
+      "name": "Capitano Moby",
+      "value": 200,
+      "rarity": "epic",
+      "image": "img/brainrots/capitano.webp"
+    },
+    {
+      "id": "cerberus",
+      "name": "Cerberus",
+      "value": 214,
+      "rarity": "legendary",
+      "image": "img/brainrots/cerberus.webp"
+    },
+    {
+      "id": "pegasus",
+      "name": "Celestial Pegasus",
+      "value": 250,
+      "rarity": "legendary",
+      "image": "img/brainrots/pegasus.webp"
+    },
+    {
+      "id": "guest666",
+      "name": "Guest666",
+      "value": 257,
+      "rarity": "legendary",
+      "image": "img/brainrots/guest666.webp"
+    },
+    {
+      "id": "cookie",
+      "name": "Cookie and Milki",
+      "value": 385,
+      "rarity": "legendary",
+      "image": "img/brainrots/cookie.webp"
+    },
+    {
+      "id": "fortunu",
+      "name": "Fortunu and Cashuru",
+      "value": 599,
+      "rarity": "legendary",
+      "image": "img/brainrots/fortunu.webp"
+    },
+    {
+      "id": "ketupatbro",
+      "name": "Ketupat Bros",
+      "value": 771,
+      "rarity": "secret",
+      "image": "img/brainrots/ketupatbro.webp"
+    },
+    {
+      "id": "foxini",
+      "name": "Foxini Lanterini",
+      "value": 857,
+      "rarity": "secret",
+      "image": "img/brainrots/foxini.webp"
+    },
+    {
+      "id": "venuspino",
+      "name": "Venuspino",
+      "value": 900,
+      "rarity": "secret",
+      "image": "img/brainrots/venuspino.webp"
+    },
+    {
+      "id": "dragon",
+      "name": "Dragon Cannelloni",
+      "value": 942,
+      "rarity": "secret",
+      "image": "img/brainrots/dragon.webp"
+    }
+  ],
+  "cases": [
+    {
+      "id": "plant",
+      "name": "Plant Party",
+      "price": 50,
+      "subtitle": "Маленький кейс. Большой вайб.",
+      "hue": 0,
+      "tag": "STARTER",
+      "image": "img/cases/plant.png",
+      "drops": [
+        {
+          "itemId": "bananito",
+          "baseChance": 0.48
+        },
+        {
+          "itemId": "foxini",
+          "baseChance": 0.27
+        },
+        {
+          "itemId": "burguro",
+          "baseChance": 0.15
+        },
+        {
+          "itemId": "capitano",
+          "baseChance": 0.07
+        },
+        {
+          "itemId": "venuspino",
+          "baseChance": 0.025
+        },
+        {
+          "itemId": "cerberus",
+          "baseChance": 0.005
+        }
+      ]
+    },
+    {
+      "id": "ocean",
+      "name": "Ocean Drive",
+      "price": 100,
+      "subtitle": "Поймай свою волну удачи.",
+      "hue": 90,
+      "tag": "FRESH",
+      "image": "img/cases/plant.png",
+      "drops": [
+        {
+          "itemId": "foxini",
+          "baseChance": 0.48
+        },
+        {
+          "itemId": "burguro",
+          "baseChance": 0.27
+        },
+        {
+          "itemId": "lavadorito",
+          "baseChance": 0.15
+        },
+        {
+          "itemId": "ketupatbro",
+          "baseChance": 0.07
+        },
+        {
+          "itemId": "dragon",
+          "baseChance": 0.025
+        },
+        {
+          "itemId": "garama",
+          "baseChance": 0.005
+        }
+      ]
+    },
+    {
+      "id": "miami",
+      "name": "Miami Vice",
+      "price": 250,
+      "subtitle": "Ночь, неон и редкие находки.",
+      "hue": 200,
+      "tag": "HOT",
+      "image": "img/cases/plant.png",
+      "drops": [
+        {
+          "itemId": "esok",
+          "baseChance": 0.48
+        },
+        {
+          "itemId": "capitano",
+          "baseChance": 0.27
+        },
+        {
+          "itemId": "venuspino",
+          "baseChance": 0.15
+        },
+        {
+          "itemId": "dragon",
+          "baseChance": 0.07
+        },
+        {
+          "itemId": "tictac",
+          "baseChance": 0.025
+        },
+        {
+          "itemId": "guest666",
+          "baseChance": 0.005
+        }
+      ]
+    },
+    {
+      "id": "sunset",
+      "name": "Golden Hour",
+      "price": 500,
+      "subtitle": "Для тех, кто целится выше.",
+      "hue": 310,
+      "tag": "PREMIUM",
+      "image": "img/cases/plant.png",
+      "drops": [
+        {
+          "itemId": "capitano",
+          "baseChance": 0.48
+        },
+        {
+          "itemId": "ketupatbro",
+          "baseChance": 0.27
+        },
+        {
+          "itemId": "dragon",
+          "baseChance": 0.15
+        },
+        {
+          "itemId": "fortunu",
+          "baseChance": 0.07
+        },
+        {
+          "itemId": "guest666",
+          "baseChance": 0.025
+        },
+        {
+          "itemId": "eviledon",
+          "baseChance": 0.005
+        }
+      ]
+    }
+  ]
+}
