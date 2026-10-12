@@ -7,7 +7,7 @@ import { connectServer, sharedRocket, verifyProof } from './server-client.js';
 
 const server = await connectServer();
 if (server?.catalog) {
-  SETTINGS.rtp=server.config.rtp || .90;
+  SETTINGS.rtp=server.config.rtp || .80;
   ITEMS.splice(0,ITEMS.length,...server.catalog.items);
   Object.keys(ITEM_BY_ID).forEach(id=>delete ITEM_BY_ID[id]); Object.assign(ITEM_BY_ID,Object.fromEntries(ITEMS.map(i=>[i.id,i])));
   CASES.splice(0,CASES.length,...server.catalog.cases);

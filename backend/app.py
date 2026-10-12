@@ -206,7 +206,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',botUsername=BOT_USERNAME,rtp=.90,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',botUsername=BOT_USERNAME,rtp=.80,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -400,7 +400,7 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
             welcome=('<tg-emoji emoji-id="5298585940577525950">🤩</tg-emoji> '
                      '<b>Добро пожаловать в Brainrot Freebie!</b>\n\n'
                      'Кейсы с брейнротами, ежедневные бонусы и бесплатный кейс за подписку.\n'
-                     '<b>90% RTP · Provably Fair</b>')
+                     '<b>Provably True</b>')
             buttons=[]
             if PUBLIC_URL.startswith('https://'):
                 buttons.append([dict(text='Играть',web_app=dict(url=PUBLIC_URL))])
