@@ -36,4 +36,181 @@ export const CASES = [
   makeCase('miami', 'Miami Vice', 250, 'Ночь, неон и редкие находки.', 200, 'HOT', ['esok', 'capitano', 'venuspino', 'dragon', 'tictac', 'guest666']),
   makeCase('sunset', 'Golden Hour', 500, 'Для тех, кто целится выше.', 310, 'PREMIUM', ['capitano', 'ketupatbro', 'dragon', 'fortunu', 'guest666', 'eviledon']),
 ];
+CASES.push(...[
+  {
+    "id": "sahur",
+    "name": "Sahur",
+    "price": 19,
+    "subtitle": "",
+    "hue": 0,
+    "tag": "",
+    "image": "img/cases/sahur.png",
+    "drops": [
+      {
+        "itemId": "67",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "lagrand",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "bananito",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "esok",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "ketupat",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "tictac",
+        "baseChance": 0.16666666666666666
+      }
+    ]
+  },
+  {
+    "id": "fastfood",
+    "name": "Fastfood",
+    "price": 49,
+    "subtitle": "",
+    "hue": 0,
+    "tag": "",
+    "image": "img/cases/fastfood.png",
+    "drops": [
+      {
+        "itemId": "bananito",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "esok",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "ketupat",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "cash",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "pizza",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "burguro",
+        "baseChance": 0.16666666666666666
+      }
+    ]
+  },
+  {
+    "id": "cash",
+    "name": "Cash",
+    "price": 99,
+    "subtitle": "",
+    "hue": 0,
+    "tag": "",
+    "image": "img/cases/cash.png",
+    "drops": [
+      {
+        "itemId": "ketupat",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "lavadorito",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "garama",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "cash",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "cookie",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "fortunu",
+        "baseChance": 0.16666666666666666
+      }
+    ]
+  },
+  {
+    "id": "olympus",
+    "name": "Olympus",
+    "price": 249,
+    "subtitle": "",
+    "hue": 0,
+    "tag": "",
+    "image": "img/cases/olympus.png",
+    "drops": [
+      {
+        "itemId": "eviledon",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "capitano",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "cerberus",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "pegasus",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "guest666",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "foxini",
+        "baseChance": 0.16666666666666666
+      }
+    ]
+  },
+  {
+    "id": "dragon",
+    "name": "Dragon",
+    "price": 499,
+    "subtitle": "",
+    "hue": 0,
+    "tag": "",
+    "image": "img/cases/dragon.png",
+    "drops": [
+      {
+        "itemId": "burguro",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "pegasus",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "cookie",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "fortunu",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "venuspino",
+        "baseChance": 0.16666666666666666
+      },
+      {
+        "itemId": "dragon",
+        "baseChance": 0.16666666666666666
+      }
+    ]
+  }
+]);
 export const CASE_BY_ID = Object.fromEntries(CASES.map(c => [c.id, c]));
