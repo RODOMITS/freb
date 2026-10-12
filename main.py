@@ -1,6 +1,8 @@
 """Bothost entrypoint: bot, Mini App and API run in one process."""
 import os
 import secrets
+import sys
+import importlib
 from pathlib import Path
 
 import uvicorn
@@ -31,5 +33,11 @@ def configure(root):
 
 
 if __name__=='__main__':
-    configure(Path(__file__).resolve().parent)
-    uvicorn.run('backend.app:app',host='0.0.0.0',port=int(os.getenv('PORT','8000')),workers=1,proxy_headers=True,forwarded_allow_ips=os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'))
+    project_root=Path(__file__).resolve().parent
+    if not (project_root/'backend/app.py').is_file():
+        raise SystemExit('Deployment is incomplete: backend/app.py must be next to main.py inside the backend folder. Upload and extract the entire Bothost.zip, preserving folders, then redeploy.')
+    sys.path.insert(0,str(project_root))
+    os.chdir(project_root)
+    configure(project_root)
+    application=importlib.import_module('backend.app').app
+    uvicorn.run(application,host='0.0.0.0',port=int(os.getenv('PORT','8000')),workers=1,proxy_headers=True,forwarded_allow_ips=os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'))
