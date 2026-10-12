@@ -34,7 +34,7 @@ class Service:
         self.items = {item['id']:item for item in catalog['items']}
         self.cases = {case['id']:case for case in catalog['cases']}
         for case_id, name, free, hue in [('daily','Бесплатный кейс','daily',90),('subscribe','Кейс за подписку','subscribe',200)]:
-            self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,hue=hue,image='img/cases/daily.webp' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
+            self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,hue=hue,image='img/cases/daily.png' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
         for case in self.cases.values():
             distribution(case,self.items)
 
