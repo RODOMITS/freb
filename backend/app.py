@@ -379,7 +379,15 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
     chat=message.get('chat',{}).get('id')
     if text in ('/start','/support','/paysupport','/terms') and chat:
         if text=='/start':
-            reply=dict(chat_id=chat,text='Brainrot Freebie',reply_markup=dict(inline_keyboard=[[dict(text='Открыть',web_app=dict(url=PUBLIC_URL))]])) if PUBLIC_URL.startswith('https://') else dict(chat_id=chat,text='Адрес Mini App ещё не настроен.')
+            welcome=('<tg-emoji emoji-id="5298585940577525950">🤩</tg-emoji> '
+                     '<b>Добро пожаловать в Brainrot Freebie!</b>\n\n'
+                     'Кейсы с брейнротами, ежедневные бонусы и бесплатный кейс за подписку.\n'
+                     '<b>85% RTP · Provably Fair</b>')
+            buttons=[]
+            if PUBLIC_URL.startswith('https://'):
+                buttons.append([dict(text='Играть',web_app=dict(url=PUBLIC_URL))])
+            buttons.append([dict(text='Новости',url='https://t.me/brainrotFreebie')])
+            reply=dict(chat_id=chat,text=welcome,parse_mode='HTML',reply_markup=dict(inline_keyboard=buttons))
         else:
             reply=dict(chat_id=chat,text=f'Поддержка: @{OWNER_USERNAME}\nУсловия: {TERMS_URL or "Условия покупки ещё не опубликованы"}')
         try:
