@@ -7,6 +7,7 @@ from .economy import cents, mines_multiplier
 
 @dataclass(frozen=True)
 class Limits:
+    max_case_price: int = 2000
     max_stake: int = 1000
     max_payout: int = 10000
     max_open_risk: int = 100000
@@ -39,6 +40,12 @@ class Limits:
             raise ValueError(f'Максимальная ставка: {self.max_stake} BStars')
         if payout>self.max_payout:
             raise ValueError(f'Максимальная выплата: {self.max_payout} BStars. Уменьши ставку.')
+
+    def check_case(self, price, payout):
+        if price>self.max_case_price:
+            raise ValueError(f'Максимальная цена кейса: {self.max_case_price} BStars')
+        if payout>self.max_payout:
+            raise ValueError('Кейс превышает лимит выплаты')
 
     def mines_steps(self, stake, bombs):
         steps=[k for k in range(1,26-bombs) if cents(stake*mines_multiplier(bombs,k))<=cents(self.max_payout)]
