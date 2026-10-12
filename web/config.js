@@ -323,7 +323,7 @@ export const RARITIES = { common: 'Обычный', rare: 'Редкий', epic: 
 export const CASES = [
   {
     "id": "sahur",
-    "name": "Утренний кейс",
+    "name": "Сахур кейс",
     "price": 19,
     "theme": "Sahur",
     "hue": 0,
@@ -395,7 +395,7 @@ export const CASES = [
   },
   {
     "id": "night",
-    "name": "Призрачный кейс",
+    "name": "Ночной кейс",
     "price": 99,
     "theme": "Тёмные брейнроты",
     "hue": 0,
@@ -429,7 +429,7 @@ export const CASES = [
   },
   {
     "id": "fastfood",
-    "name": "Сытный кейс",
+    "name": "Фастфуд кейс",
     "price": 199,
     "theme": "Еда и сладости",
     "hue": 0,
@@ -467,7 +467,7 @@ export const CASES = [
   },
   {
     "id": "feast",
-    "name": "Сладкий кейс",
+    "name": "Праздничный кейс",
     "price": 399,
     "theme": "Еда и сладости",
     "hue": 0,
@@ -569,7 +569,7 @@ export const CASES = [
   },
   {
     "id": "olympus",
-    "name": "Мифический кейс",
+    "name": "Олимпус кейс",
     "price": 499,
     "theme": "Мифы и боссы",
     "hue": 0,
@@ -637,7 +637,7 @@ export const CASES = [
   },
   {
     "id": "miami",
-    "name": "Розовый кейс",
+    "name": "Майами кейс",
     "price": 249,
     "theme": "Сад и зайцы",
     "hue": 0,
@@ -671,7 +671,7 @@ export const CASES = [
   },
   {
     "id": "sunset",
-    "name": "Золотой кейс",
+    "name": "Закатный кейс",
     "price": 1299,
     "theme": "Братья и комбинации",
     "hue": 0,
@@ -709,7 +709,7 @@ export const CASES = [
   },
   {
     "id": "burrow",
-    "name": "Пасхальный кейс",
+    "name": "Заячий кейс",
     "price": 399,
     "theme": "Сад и зайцы",
     "hue": 0,
@@ -743,7 +743,7 @@ export const CASES = [
   },
   {
     "id": "combination",
-    "name": "Сборный кейс",
+    "name": "Комбинационный кейс",
     "price": 799,
     "theme": "Братья и комбинации",
     "hue": 0,
@@ -777,7 +777,7 @@ export const CASES = [
   },
   {
     "id": "heroes",
-    "name": "Героический кейс",
+    "name": "Геройский кейс",
     "price": 599,
     "theme": "Герои",
     "hue": 0,
@@ -811,7 +811,7 @@ export const CASES = [
   },
   {
     "id": "bosses",
-    "name": "Тайный кейс",
+    "name": "Босс кейс",
     "price": 1499,
     "theme": "Мифы и боссы",
     "hue": 0,

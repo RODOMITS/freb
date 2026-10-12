@@ -37,6 +37,9 @@ class Service:
             self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,hue=hue,image='img/cases/daily.png' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
         for case_id,name in [('referral','За приглашение'),('nickname','За ник')]:
             self.cases[case_id]=dict(id=case_id,name=name,price=0,free=case_id,theme='Бесплатные',hue=0,image='img/cases/'+case_id+'.png',drops=[dict(itemId=i,baseChance=p) for i,p in [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)]])
+        web_root=Path(__file__).resolve().parent.parent
+        web_root=web_root/'web' if (web_root/'web').exists() else web_root
+        self.cases={key:case for key,case in self.cases.items() if (web_root/case['image']).is_file()}
         for case in self.cases.values():
             distribution(case,self.items)
 
