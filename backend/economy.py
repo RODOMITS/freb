@@ -1,6 +1,6 @@
 import math
 
-RTP = .85
+RTP = .90
 
 
 def distribution(case, items):
@@ -44,24 +44,24 @@ def landing(chance, rng):
     return dict(x=x, y=y, angle=angle/math.tau*360, win=y >= level)
 
 
-def slots(value, ids, rng):
+def slots(value, ids, rng, rtp=RTP):
     unit, pool = rng.draw(), list(ids)
     a, b, c = rng.pick(pool), rng.pick(pool), rng.pick(pool)
-    symbols = [a,a,a] if unit < .03 else [a,a,b] if unit < .38 else [a,b,c]
+    symbols = [a,a,a] if unit < .03 else [a,a,b] if unit < .03+(rtp-.15)/2 else [a,b,c]
     shuffled = [rng.pick(symbols) for _ in range(3)]
     multiplier = 5 if len(set(shuffled)) == 1 else 2 if len(set(shuffled)) == 2 else 0
     return dict(symbols=shuffled, multiplier=multiplier, betValue=value, payout=value*multiplier)
 
 
-def mines_multiplier(bombs, opened):
+def mines_multiplier(bombs, opened, rtp=RTP):
     if not opened:
         return 0
     survival = math.prod((25-bombs-i)/(25-i) for i in range(opened))
-    return RTP/survival
+    return rtp/survival
 
 
-def crash_point(unit):
-    return min(100., 1. if unit < 1-RTP else RTP/(1-unit))
+def crash_point(unit, rtp=RTP):
+    return min(100., 1. if unit < 1-rtp else rtp/(1-unit))
 
 
 def cents(value):

@@ -7,6 +7,7 @@ import { connectServer, sharedRocket, verifyProof } from './server-client.js';
 
 const server = await connectServer();
 if (server?.catalog) {
+  SETTINGS.rtp=server.config.rtp || .90;
   ITEMS.splice(0,ITEMS.length,...server.catalog.items);
   Object.keys(ITEM_BY_ID).forEach(id=>delete ITEM_BY_ID[id]); Object.assign(ITEM_BY_ID,Object.fromEntries(ITEMS.map(i=>[i.id,i])));
   CASES.splice(0,CASES.length,...server.catalog.cases);
@@ -125,8 +126,11 @@ function feedMarkup() {
     return `<div class="drop-pill ${item.rarity}"><img src="${item.image}" alt="${esc(item.name)}"><div><strong>${esc(item.name)}</strong>${!drop.preview ? `<small>${esc(drop.playerName || playerName)}</small>` : ''}<div class="drop-price">✦ ${money(item.value)}</div></div></div>`;
   }).join('')}</div></section>`;
 }
+const freeLabel=c=>({daily:'Раз в 24 часа',subscribe:'За подписку',referral:'По приглашению',nickname:'За ник'}[c.free] || 'Бесплатно');
 function renderCases() {
-  return `${feedMarkup()}<section><div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div><div class="case-grid">${CASES.map(c => `<a href="#case/${c.id}" class="case-card ${c.id}" style="--hue:${c.hue}deg"><h3>${c.name}</h3><img class="case-art" src="${c.image}" alt="Кейс ${c.name}"><span class="case-price">${c.free ? c.free==='daily' ? 'Раз в 24 часа' : 'За подписку' : `<span class="coin">✦</span>${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`;
+  const groups=Object.groupBy ? Object.groupBy(CASES,c=>c.free ? 'Бесплатные' : c.theme || 'Классика') : CASES.reduce((a,c)=>{(a[c.free ? 'Бесплатные' : c.theme || 'Классика'] ||= []).push(c);return a;},{});
+  const top=state.topDrop, topItem=top && ITEM_BY_ID[top.itemId];
+  return `${feedMarkup()}${topItem ? `<section class="top-drop"><img src="${topItem.image}" alt=""><div><small>ТОП ДРОП ДНЯ · МСК</small><h2>${esc(topItem.name)}</h2><span>${esc(top.playerName)} · ✦ ${money(topItem.value)}</span></div></section>` : ''}<div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div><nav class="theme-tabs">${Object.keys(groups).map((name,i)=>`<a href="#theme-${i}" data-theme="theme-${i}">${esc(name)}</a>`).join('')}</nav>${Object.entries(groups).map(([name,cases],i)=>`<section id="theme-${i}" class="case-theme"><h2>${esc(name)}</h2><div class="case-grid">${cases.map(c=>`<a href="#case/${c.id}" class="case-card" style="--hue:${c.hue}deg"><h3>${esc(c.name)}</h3><img class="case-art" src="${c.image}" onerror="this.onerror=null;this.src='img/cases/plant.png'" alt="Кейс ${esc(c.name)}"><span class="case-price">${c.free ? freeLabel(c) : `✦ ${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`).join('')}`;
 }
 function shuffledBrainrots(caseConfig) {
   const items = caseConfig.drops.map(drop => ITEM_BY_ID[drop.itemId]);
@@ -138,10 +142,10 @@ function shuffledBrainrots(caseConfig) {
 }
 function renderCase(caseConfig) {
   const preview = Array.from({length:Math.ceil(12 / caseConfig.drops.length)}, () => shuffledBrainrots(caseConfig)).flat();
-  const claim=state.freeClaims?.[caseConfig.id], unavailable=server && caseConfig.free && claim && (caseConfig.free==='subscribe' || server.now()<claim+86400000);
+  const claim=state.freeClaims?.[caseConfig.id], unavailable=server && caseConfig.free && claim && (caseConfig.free!=='daily' || server.now()<claim+86400000);
   return `<a class="back" href="#cases">${icon('arrow')}Все кейсы</a><section><div class="case-page-heading"><h1>${caseConfig.name}</h1></div>
     <div class="roulette" aria-label="Рулетка открытия кейса"><div class="roulette-track">${preview.map(i => itemCard(i, { eager:true })).join('')}</div><div class="roulette-selection"></div></div>
-    <div class="open-controls"><button class="primary" data-action="open-case" data-id="${caseConfig.id}" ${state.balance < caseConfig.price || unavailable ? 'disabled' : ''}>${icon('box')}${caseConfig.free ? unavailable ? caseConfig.free==='subscribe' ? 'Уже получен' : 'Доступен раз в 24 часа' : 'Открыть бесплатно' : `Открыть за <span class="coin">✦</span>${money(caseConfig.price)}`}</button>${fastButton()}</div>
+    <div class="open-controls"><button class="primary" data-action="open-case" data-id="${caseConfig.id}" ${state.balance < caseConfig.price || unavailable ? 'disabled' : ''}>${icon('box')}${caseConfig.free ? unavailable ? caseConfig.free!=='daily' ? 'Уже получен' : 'Доступен раз в 24 часа' : 'Открыть бесплатно' : `Открыть за <span class="coin">✦</span>${money(caseConfig.price)}`}</button>${fastButton()}</div>
     ${state.balance < caseConfig.price ? '<div class="demo-banner" style="margin:-16px 0 24px;text-align:center">Не хватает BStars. <button data-action="topup" style="color:var(--pink)">Пополнить баланс →</button></div>' : ''}
     <div class="contents-heading"><h2>Что внутри кейса</h2><button class="info-link" data-action="case-odds" data-id="${caseConfig.id}">Базовые шансы ⓘ</button></div><div class="item-grid">${caseConfig.drops.map(d => itemCard(ITEM_BY_ID[d.itemId], { chance: d.baseChance })).join('')}</div>
     </section>`;
@@ -177,7 +181,7 @@ function gauge(chance) {
     <path class="glass-highlight" d="M39 77a92 92 0 0 1 119-41" fill="none" stroke="#ffffff" stroke-opacity=".1" stroke-width="1.5"/>
     <line id="landing-trail" x1="120" y1="120" x2="120" y2="120" stroke="#fff" stroke-width=".8" stroke-dasharray="2 3" opacity="0"/>
     <circle id="landing-ripple" cx="120" cy="120" r="3" fill="none" stroke="#fff" stroke-width="1.5" opacity="0"/>
-    <circle id="landing-dot" cx="120" cy="120" r="3.3" fill="#fff" opacity="0"/>
+    <path id="landing-dot" d="M0 0L-5 -12L5 -12Z" fill="#fff" stroke="#171020" stroke-width=".5" opacity="0"/>
     </svg><div class="gauge-copy"><strong>${percent(chance)}</strong><small>шанс успеха</small></div><div class="pointer-orbit"><svg class="pointer-tip" viewBox="0 0 16 20" aria-hidden="true"><path d="M1 1h14L8 18Z" fill="#ff9bce" stroke="#ffb5dc" stroke-width="1"/></svg></div></div>`;
 }
 function animateGauge(chance) {
@@ -219,9 +223,20 @@ function renderProfile() {
   const safePhoto = photo && /^https:\/\//i.test(photo) ? photo : null;
   return `<div class="profile-head compact-head"><h1>Профиль</h1><a class="admin-link" href="#admin">${icon('shield')}Админ-панель</a></div><section class="profile-card"><div class="avatar">${safePhoto ? `<img src="${esc(safePhoto)}" alt="Аватар пользователя" referrerpolicy="no-referrer">` : esc(playerName.replace('@','').slice(0,2).toUpperCase())}</div><div class="profile-identity"><h2>${esc(playerName)}</h2></div><div class="profile-stats"><div><strong>${money(state.stats.opened)}</strong><small>Кейсов открыто</small></div><div><strong>${money(state.stats.upgrades)}</strong><small>Апгрейдов</small></div><div><strong>${money(state.stats.wins)}</strong><small>Успешных</small></div></div></section>
     <section class="promo-panel">${icon('gift')}<div class="promo-copy"><strong>Промокод</strong></div><form class="promo-form" id="promo-form"><input name="promo" autocomplete="off" aria-label="Промокод" placeholder="Промокод" maxlength="30" required><button class="primary">Активировать</button></form></section>
-    <section><div class="inventory-heading"><h2>Инвентарь <span>${state.inventory.length}</span></h2><div class="wallet-actions"><button class="primary" data-action="topup">${icon('plus')}Пополнить</button><button class="secondary" data-action="withdraw">${icon('withdraw')}Вывод</button></div></div><div class="inventory-meta"><span>Нажми на брейнрота, чтобы продать</span><span>Стоимость: ✦ ${money(totalValue)}</span></div>${state.inventory.length ? `<div class="item-grid inventory-grid">${state.inventory.map(i => itemCard(ITEM_BY_ID[i.itemId], { action: 'sell', id: i.uid, sale: true })).join('')}</div>` : inventoryEmpty()}
-    ${!storageWorks ? '<p class="storage-error">Браузер запретил локальное сохранение. После перезагрузки прогресс может сброситься.</p>' : ''}</section>${renderHistory(state,historyFilter,historyLimit,featureUI)}`;
+    <section><div class="inventory-heading"><h2>Инвентарь <span>${state.inventory.length+(state.pendingInventory || []).length}</span></h2><div class="wallet-actions"><button class="primary" data-action="topup">${icon('plus')}Пополнить</button><button class="secondary" data-action="withdraw">${icon('withdraw')}Вывод</button></div></div><div class="inventory-meta"><span>Нажми на брейнрота, чтобы продать</span><span>Стоимость: ✦ ${money(totalValue)}</span></div>${state.inventory.length ? `<div class="item-grid inventory-grid">${state.inventory.map(i => itemCard(ITEM_BY_ID[i.itemId], { action: 'sell', id: i.uid, sale: true })).join('')}</div>` : inventoryEmpty()}
+    ${pendingInventoryMarkup()}${partnerMarkup()}${!storageWorks ? '<p class="storage-error">Браузер запретил локальное сохранение. После перезагрузки прогресс может сброситься.</p>' : ''}</section>${renderHistory(state,historyFilter,historyLimit,featureUI)}`;
 }
+function pendingInventoryMarkup() {
+  const pending=state.pendingInventory || [];
+  return `${pending.length ? `<div class="item-grid inventory-grid pending-inventory">${pending.map(e=>`<div class="pending-item">${itemCard(ITEM_BY_ID[e.itemId],{action:'locked-item',id:e.uid}).replace('<button ','<button disabled ')}<span>На выводе</span><button class="secondary" data-action="withdraw-cancel" data-id="${e.requestId}">Снять с вывода</button></div>`).join('')}</div>` : ''}<p class="withdraw-schedule">Вывод предметов: суббота, 16:00–17:00 МСК. Отмена заявки доступна в любое время.</p>`;
+}
+function partnerMarkup() {
+  if(!server || !state.partner) return '';
+  const p=state.partner, link=server.config.botUsername ? `https://t.me/${server.config.botUsername}?start=ref_${p.code}` : '';
+  return `<section class="partner-panel"><div class="selection-title"><h2>Приглашай друзей</h2><strong>40% Rev Share</strong></div><p>Комиссия от чистого проигрыша приглашённых с учётом их выигрышей и подтверждённых депозитов.</p><div class="partner-stats"><span>Приглашено<b>${p.count}</b></span><span>Доступно<b>✦ ${money(p.available)}</b></span><span>Забрано / в заявках<b>✦ ${money(p.claimed)}</b></span></div><form id="partner-code-form" class="promo-form"><input name="code" value="${esc(p.code)}" minlength="4" maxlength="24" required aria-label="Реферальный код"><button class="secondary">Сохранить код</button></form>${link ? `<input class="referral-link" readonly value="${esc(link)}" aria-label="Реферальная ссылка"><button class="secondary" data-action="copy-referral">Копировать ссылку</button>` : '<p>Ссылка появится после настройки имени бота на сервере.</p>'}<div class="game-actions"><button class="primary" data-action="partner-claim" ${p.available<=0 ? 'disabled' : ''}>Забрать на баланс</button><button class="secondary" data-action="partner-withdraw" ${p.available<=0 ? 'disabled' : ''}>Вывести комиссию</button></div><small>Заявка на выплату комиссии — в любой день. Проверки платежей сохраняются.</small>${(state.transfers || []).filter(t=>t.kind==='partner-withdraw' && t.status==='pending' && (!t.userId || t.userId===state.profile.id)).map(t=>`<p>Комиссия на выводе: ${money(t.data.value)} <button class="info-link" data-action="withdraw-cancel" data-id="${t.id}">Отменить</button></p>`).join('')}</section>`;
+}
+document.addEventListener('click',event=>{const a=event.target.closest('[data-theme]');if(a){event.preventDefault();document.getElementById(a.dataset.theme)?.scrollIntoView({behavior:'smooth',block:'start'});}});
+
 function slotSymbol(itemId) {
   const item = ITEM_BY_ID[itemId];
   return `<div class="reel-symbol ${item.rarity}"><img src="${item.image}" alt="${esc(item.name)}" draggable="false"><span>${esc(item.name)}</span></div>`;
@@ -304,7 +319,7 @@ function watchTicks(animation, count) {
 }
 async function openCase(caseId) {
   if (busy) return;
-  const c = CASE_BY_ID[caseId]; if (!c || state.balance < c.price) return toast('Не хватает BStars. Пополни баланс бесплатно в профиле.');
+  const c = CASE_BY_ID[caseId]; if (!c || state.balance < c.price) return toast('Не хватает BStars. Пополни баланс в профиле.');
   const fast = fastMode || reducedMotion.matches;
   const response=server ? await serverAction('case',{caseId}) : null;
   if (server && !response) return;
@@ -381,6 +396,10 @@ async function upgrade() {
   $('.upgrade-circle').classList.remove('spinning'); $('.upgrade-circle').classList.add('landing');
   const angle = landing.angle * Math.PI / 180;
   const startX = 120 + Math.sin(angle) * 104, startY = 120 - Math.cos(angle) * 104;
+  pointer.style.opacity='0';
+  $('.liquid-wave').style.visibility='hidden';
+  cancelAnimationFrame(gaugeFrame);
+  const exactLevel=liquidLevel(chance); $('#liquid-body').setAttribute('y',exactLevel); $('#water-mask').setAttribute('y',exactLevel); $('#liquid-surface').setAttribute('transform',`translate(0 ${exactLevel})`);
   const dot = $('#landing-dot'), trail = $('#landing-trail'), ripple = $('#landing-ripple');
   dot.setAttribute('opacity', '1'); trail.setAttribute('opacity', '.5');
   trail.setAttribute('x1', startX); trail.setAttribute('y1', startY);
@@ -389,7 +408,7 @@ async function upgrade() {
     function frame(now) {
       const t = reducedMotion.matches ? 1 : Math.max(0, Math.min((now-start)/(fast ? 100 : 650),1)), eased = 1-(1-t)**3;
       const x = startX + (landing.x-startX)*eased, y = startY + (landing.y-startY)*eased;
-      dot.setAttribute('cx',x); dot.setAttribute('cy',y); trail.setAttribute('x2',x); trail.setAttribute('y2',y);
+      dot.setAttribute('transform',`translate(${x} ${y})`); trail.setAttribute('x2',x); trail.setAttribute('y2',y);
       if (t < 1) requestAnimationFrame(frame); else resolve();
     }
     requestAnimationFrame(frame);
@@ -401,6 +420,7 @@ async function upgrade() {
     const rippleAnimation = ripple.animate([{transform:'scale(1)',opacity:1},{transform:'scale(7)',opacity:0}],{duration:fast ? 160 : 850,easing:'ease-out'});
     try { await rippleAnimation.finished; } catch {}
   }
+  await new Promise(resolve=>setTimeout(resolve,fast ? 400 : 900));
   setBusy(false); sourceUids.clear(); targetId = null; quick = null; render();
   openModal(`<div class="modal-content ${win ? target.rarity : source.rarity}"><h2>${win ? 'Апгрейд выполнен' : 'Апгрейд не удался'}</h2>${win ? `<div class="result-art"><img src="${target.image}" alt="${esc(target.name)}"></div><div class="result-name">${esc(target.name)}</div><div class="result-value">✦ ${money(target.value)}</div>` : '<div class="modal-status-icon" style="color:#e38fa9">↺</div>'}<p style="margin-top:14px">${win ? 'Предмет добавлен в инвентарь.' : `Потрачено предметов: ${stake.entries.length} · ✦ ${money(stake.value)}`}<br>Шанс: ${percent(chance)}.</p><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button>${win ? `<button class="secondary" data-action="to-upgrade" data-id="${wonUid}">Ещё апгрейд</button>` : '<button class="secondary" data-action="goto-cases">К кейсам</button>'}</div></div>`);
 }
@@ -545,17 +565,19 @@ function runServerRocket() {
   }
   serverRocketFrame=requestAnimationFrame(frame);
 }
+function walletCard(item,options) { return itemCard(item,options).replace('<button ','<button type="button" '); }
 function depositDialog() {
-  openModal(`<div class="modal-content"><h2>Пополнение</h2><form id="deposit-form" class="admin-form"><label>Брейнрот для депозита<select name="itemId">${ITEMS.filter(i=>i.value>=25).map(i=>`<option value="${i.id}">${esc(i.name)} · ${money(i.value)} BStars</option>`).join('')}</select></label><button class="primary">Создать заявку</button></form><p>Передай предмет владельцу в игре. BStars начислятся после подтверждения.</p><form id="stars-form" class="admin-form"><label>Telegram Stars<input name="stars" type="number" min="1" max="10000" step="1" required value="100"></label><p>1 Star = 1,5 BStars<br>После оплаты Stars вывод предметов ограничен на ${money(server.config.starsHoldHours/24)} дней. Игры и продажа внутри сайта доступны.</p>${server.config.paymentsEnabled ? `<label class="purchase-consent"><input type="checkbox" name="terms" required>Принимаю <a href="${esc(server.config.termsUrl)}" target="_blank" rel="noopener">условия покупки</a> и срок ограничения вывода</label><button class="primary">Оплатить звёздами</button>` : '<p>Оплата звёздами ещё не включена.</p>'}</form></div>`);
+  openModal(`<div class="modal-content wallet-modal"><h2>Пополнение</h2><p>Выбери брейнрота для депозита</p><form id="deposit-form" class="wallet-deposit-form"><input type="hidden" name="itemId" value=""><div class="item-grid wallet-item-grid" aria-label="Брейнроты для депозита">${ITEMS.filter(i=>i.value>=ITEM_BY_ID.garama.value && i.id!=='eviledon').map(i=>walletCard(i,{action:'select-deposit',id:i.id,selected:false})).join('')}</div><div class="wallet-selection"><span id="deposit-summary">Предмет не выбран</span><button class="primary" id="deposit-submit" disabled>Создать заявку</button></div></form><p>Передай предмет владельцу в игре. BStars начислятся после подтверждения.</p><form id="stars-form" class="admin-form wallet-stars"><label>Telegram Stars<input name="stars" type="number" min="1" max="10000" step="1" required value="100"></label><p>1 Star = 1,5 BStars<br>После оплаты Stars вывод предметов ограничен на ${money(server.config.starsHoldHours/24)} дней. Игры и продажа внутри сайта доступны.</p>${server.config.paymentsEnabled ? `<label class="purchase-consent"><input type="checkbox" name="terms" required>Принимаю <a href="${esc(server.config.termsUrl)}" target="_blank" rel="noopener">условия покупки</a> и срок ограничения вывода</label><button class="primary">Оплатить звёздами</button>` : '<p>Оплата звёздами ещё не включена.</p>'}</form></div>`);
 }
 let withdrawUids=new Set();
 function withdrawalDialog() {
+  if(server && !state.withdrawalOpen) return openModal('<div class="modal-content"><h2>Расписание вывода</h2><p>Заявки и выдача предметов доступны только в субботу с 16:00 до 17:00 МСК.</p><p>Снять предмет с вывода можно в любое время в профиле.</p></div>');
   if(state.debt>0 || state.refundReviewPending || state.withdrawHeldUntil>server.now()) {
     openModal(`<div class="modal-content"><h2>Вывод временно ограничен</h2><p>${state.debt>0 ? `Задолженность: ${money(state.debt)} BStars. Обратись в поддержку.` : state.refundReviewPending ? 'Возврат Stars уточняется. Обратись в поддержку.' : `После оплаты Stars вывод доступен с ${new Date(state.withdrawHeldUntil).toLocaleString('ru-RU')}.`}</p><a class="secondary" href="${esc(server.config.ownerUrl)}" target="_blank" rel="noopener">Поддержка</a></div>`); return;
   }
   const eligible=state.inventory.filter(e=>['ketupat','garama','cerberus','dragon'].includes(e.itemId));
   withdrawUids=new Set();
-  openModal(`<div class="modal-content"><h2>Вывод брейнротов</h2><p>Выбери предметы. До решения администратора они будут заблокированы.</p><div class="item-grid withdrawal-grid">${eligible.map(e=>itemCard(ITEM_BY_ID[e.itemId],{action:'withdraw-select',id:e.uid})).join('')}</div>${eligible.length ? '<button class="primary" data-action="withdraw-submit">Создать заявку</button>' : '<p>Для вывода нужны Ketupat Kepat, Garama, Cerberus или Dragon Cannelloni.</p>'}</div>`);
+  openModal(`<div class="modal-content wallet-modal"><h2>Вывод брейнротов</h2><p>Выбери предметы. До решения администратора они будут заблокированы.</p><div class="item-grid wallet-item-grid" aria-label="Предметы для вывода">${eligible.map(e=>walletCard(ITEM_BY_ID[e.itemId],{action:'select-withdraw',id:e.uid,selected:false})).join('')}</div>${eligible.length ? '<div class="wallet-selection"><span id="withdraw-summary">Выбрано: 0 · ✦ 0</span><button class="primary" data-action="withdraw-submit" disabled>Создать заявку</button></div>' : '<p>Для вывода нужны Ketupat Kepat, Garama, Cerberus или Dragon Cannelloni.</p>'}</div>`);
 }
 function ownerContact(requestId) {
   openModal(`<div class="modal-content"><h2>Заявка создана</h2><p>Номер: ${esc(requestId)}. Отправь его владельцу.</p><a class="primary" href="${esc(server.config.ownerUrl)}" target="_blank" rel="noopener">Открыть личные сообщения</a></div>`);
@@ -567,7 +589,7 @@ function enhanceServerProfile() {
   $('.profile-card').insertAdjacentHTML('afterend',`<section class="history-panel"><details><summary>Проверка честности</summary><p class="proof-text">Server hash: ${esc(state.fair.serverHash)}<br>Client seed: ${esc(state.fair.clientSeed)}<br>Nonce: ${state.fair.nonce}</p><form id="fair-form" class="admin-form"><label>Новый client seed<input name="clientSeed" required maxlength="80" value="${esc(state.fair.clientSeed)}"></label><button class="secondary">Раскрыть старый seed и сменить</button></form></details></section><section class="history-panel"><h2>Заявки</h2>${state.transfers.filter(t=>!t.userId || t.userId===state.profile.id).map(t=>`<p class="proof-text">${t.kind==='deposit' ? 'Депозит' : 'Вывод'} · ${esc(t.id)} · ${{pending:'Ожидает',approved:'Подтверждена',rejected:'Отклонена'}[t.status] || esc(t.status)}</p>`).join('') || '<p class="proof-text">Заявок пока нет</p>'}</section>`);
 }
 function enhanceFinancialAdmin() {
-  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel"><div class="selection-title"><h2>Контроль операций</h2></div><p class="proof-text">Бонусы сегодня: ${money(state.bonusSpentToday)} / ${money(state.limits.daily_bonus_budget)} BStars<br>Максимальная выплата: ${money(state.limits.max_payout)} BStars<br>Лимит активного риска: ${money(state.limits.max_open_risk)} BStars</p><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
+  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel" data-admin-section="money"><div class="selection-title"><h2>Контроль операций</h2></div><p class="proof-text">Бонусы сегодня: ${money(state.bonusSpentToday)} / ${money(state.limits.daily_bonus_budget)} BStars<br>Максимальная выплата: ${money(state.limits.max_payout)} BStars<br>Лимит активного риска: ${money(state.limits.max_open_risk)} BStars</p><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
 }
 async function downloadBackup() {
   try {const blob=await server.download('/api/admin/backup'), url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='freebie-backup.sqlite3';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);} catch(error){toast(error.message);}
@@ -581,9 +603,9 @@ async function pollServer() {
         adoptServerState(next);
         if($('#mine-timer') && state.mines?.status==='active') $('#mine-timer').textContent=`До завершения: ${Math.max(0,Math.ceil((state.mines.expiresAt-server.now())/1000))}с`;
         if(before.rocket?.status==='active' && state.rocket?.status!=='active' && state.rocket?.id===before.rocket.id) rocketResult();
-        const financialChanged=JSON.stringify([before.inventory,before.balance,before.gamesPaused,before.debt,before.withdrawHeldUntil,before.refundReviewPending])!==JSON.stringify([state.inventory,state.balance,state.gamesPaused,state.debt,state.withdrawHeldUntil,state.refundReviewPending]);
+        const financialChanged=JSON.stringify([before.inventory,before.balance,before.gamesPaused,before.debt,before.withdrawHeldUntil,before.refundReviewPending,before.pendingInventory,before.partner,before.withdrawalOpen])!==JSON.stringify([state.inventory,state.balance,state.gamesPaused,state.debt,state.withdrawHeldUntil,state.refundReviewPending,state.pendingInventory,state.partner,state.withdrawalOpen]);
         const flightChanged=JSON.stringify([before.round?.id,before.round?.ended,before.rocket?.status,before.mines])!==JSON.stringify([state.round?.id,state.round?.ended,state.rocket?.status,state.mines]);
-        const changed=financialChanged || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
+        const changed=financialChanged || activeRoute==='cases' && JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
         const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday]);
         if((changed || adminChanged) && !$('#modal').open) {
           const values=[...document.querySelectorAll('#main input')].filter(i=>i.name && i.form?.id).map(i=>({form:i.form.id,name:i.name,value:i.value}));
@@ -615,9 +637,9 @@ async function showProof(id) {
       const draws=checked.draws; let result;
       if(proof.game==='case') { if(proof.table) {let cumulative=0;result=proof.table.find(d=>(cumulative+=d.chance)>draws[0])?.itemId || proof.table.at(-1).itemId;} else result=rollCase(CASE_BY_ID[proof.caseId],draws[0]); }
       else if(proof.game==='upgrade') result=upgradeLanding(proof.chance,draws[0],draws[1]);
-      else if(proof.game==='slots') {let cursor=1;result=rollSlots(1,draws[0],()=>draws[cursor++]).symbols;}
+      else if(proof.game==='slots') {let cursor=1;result=rollSlots(1,draws[0],()=>draws[cursor++],{tripleChance:.03,pairChance:((proof.rtp || .85)-.15)/2}).symbols;}
       else if(proof.game==='mines') {const pool=Array.from({length:25},(_,i)=>i);result=Array.from({length:proof.bombCount},(_,i)=>pool.splice(Math.floor(draws[i]*pool.length),1)[0]);}
-      else result=Math.min(100,draws[0]<.15 ? 1 : .85/(1-draws[0]));
+      else result=Math.min(100,draws[0]<(1-(proof.rtp || .85)) ? 1 : (proof.rtp || .85)/(1-draws[0]));
       const match=proof.game==='upgrade' ? expected && expected.win===result.win && Math.abs(expected.x-result.x)<1e-8 && Math.abs(expected.y-result.y)<1e-8 : proof.game==='rocket' ? Math.abs(expected-result)<1e-8 : JSON.stringify(expected)===JSON.stringify(result);
       status=expected===undefined ? 'Хеш подтверждён. Для старой записи результат можно проверить независимым скриптом.' : match ? 'Хеш и результат подтверждены.' : 'Результат не совпадает с проверкой.';
     }
@@ -667,9 +689,24 @@ document.addEventListener('click', event => {
     case 'quick': quickTarget(id); break;
     case 'sell': sellDialog(id); break;
     case 'confirm-sell': sell(id); break;
+    case 'admin-tab': document.querySelectorAll('[data-admin-section]').forEach(s=>s.hidden=id!=='all' && s.dataset.adminSection!==id);document.querySelectorAll('[data-action=admin-tab]').forEach(b=>b.classList.toggle('active',b.dataset.id===id));break;
+    case 'admin-user': $('#admin-balance-form').elements.namedItem('userId').value=id;toast('Пользователь выбран');break;
+    case 'locked-item': break;
+    case 'withdraw-cancel': void serverAction('withdraw-cancel',{requestId:id}).then(r=>{if(r)render();}); break;
+    case 'partner-claim': case 'partner-withdraw': void serverAction(action,{}).then(r=>{if(r){render();if(r.result?.requestId)ownerContact(r.result.requestId);}});break;
+    case 'copy-referral': navigator.clipboard.writeText($('.referral-link').value).then(()=>toast('Ссылка скопирована')).catch(()=>toast('Скопируй ссылку из поля'));break;
     case 'topup': topup(); break;
     case 'withdraw': if(server) withdrawalDialog(); else openModal('<div class="modal-content"><div class="modal-status-icon">↗</div><h2>Вывод</h2><p>Вывод пока недоступен.</p><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button></div></div>'); break;
-    case 'withdraw-select': withdrawUids.has(id) ? withdrawUids.delete(id) : withdrawUids.add(id); button.classList.toggle('selected',withdrawUids.has(id)); button.setAttribute('aria-pressed',String(withdrawUids.has(id))); break;
+    case 'select-deposit': {
+      if(!ITEM_BY_ID[id] || ITEM_BY_ID[id].value<ITEM_BY_ID.garama.value || id==='eviledon') break;
+      document.querySelectorAll('[data-action="select-deposit"]').forEach(card=>{const selected=card.dataset.id===id;card.classList.toggle('selected',selected);card.setAttribute('aria-pressed',String(selected));card.querySelector('.selected-check')?.remove();if(selected)card.insertAdjacentHTML('afterbegin','<span class="selected-check">✓</span>');});
+      $('#deposit-form').elements.namedItem('itemId').value=id;$('#deposit-summary').textContent=`${ITEM_BY_ID[id].name} · ✦ ${money(ITEM_BY_ID[id].value)}`;$('#deposit-submit').disabled=false;break;
+    }
+    case 'select-withdraw': {
+      withdrawUids.has(id) ? withdrawUids.delete(id) : withdrawUids.add(id);
+      const selected=withdrawUids.has(id);button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));button.querySelector('.selected-check')?.remove();if(selected)button.insertAdjacentHTML('afterbegin','<span class="selected-check">✓</span>');
+      const value=state.inventory.filter(e=>withdrawUids.has(e.uid)).reduce((sum,e)=>sum+ITEM_BY_ID[e.itemId].value,0);$('#withdraw-summary').textContent=`Выбрано: ${withdrawUids.size} · ✦ ${money(value)}`;$('[data-action="withdraw-submit"]').disabled=!withdrawUids.size;break;
+    }
     case 'withdraw-submit': void serverAction('withdraw',{uids:[...withdrawUids]}).then(r=>{if(r){render();ownerContact(r.result.requestId);}}); break;
     case 'transfer-approve': case 'transfer-reject': void serverAction('admin-transfer',{requestId:id,decision:action==='transfer-approve' ? 'approve' : 'reject'}).then(r=>{if(r)render();}); break;
     case 'balance': if(server) depositDialog(); else openModal(`<div class="modal-content"><h2>Баланс</h2><div class="result-value">✦ ${money(state.balance)} BStars</div><div class="modal-actions"><button class="primary" data-action="topup">Пополнить +100</button><button class="secondary" data-action="goto-profile">В профиль</button></div></div>`); break;
@@ -687,6 +724,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('submit', async event => {
   const formId=event.target.id;
+  if(formId==='partner-code-form'){event.preventDefault();if(busy)return;const r=await serverAction('partner-code',{code:new FormData(event.target).get('code')});if(r)render();return;}
   if (!['promo-form','admin-balance-form','admin-promo-form','deposit-form','stars-form','fair-form'].includes(formId)) return;
   event.preventDefault(); if (busy) return;
   const data=new FormData(event.target);
@@ -709,3 +747,6 @@ document.addEventListener('submit', async event => {
 persist(); render();
 if(server && !server.locked) void pollServer();
 
+
+document.addEventListener('input',event=>{if(event.target.id==='admin-user-search'){const q=event.target.value.toLowerCase();document.querySelectorAll('[data-search]').forEach(b=>b.hidden=!b.dataset.search.includes(q));}});
+document.addEventListener('change',event=>{if(event.target.id==='admin-transfer-filter'){const q=event.target.value;document.querySelectorAll('.transfer-row').forEach(r=>r.hidden=q==='pending' ? r.dataset.status!=='pending' : q!=='all' && r.dataset.kind!==q);}});
