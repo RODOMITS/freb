@@ -128,8 +128,8 @@ function feedMarkup() {
 function renderCases() {
   return `${feedMarkup()}<section><div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div><div class="case-grid">${CASES.map(c => `<a href="#case/${c.id}" class="case-card ${c.id}" style="--hue:${c.hue}deg"><h3>${c.name}</h3><img class="case-art" src="${c.image}" alt="Кейс ${c.name}"><span class="case-price">${c.free ? c.free==='daily' ? 'Раз в 24 часа' : 'За подписку' : `<span class="coin">✦</span>${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`;
 }
-function shuffledBrainrots() {
-  const items = [...ITEMS];
+function shuffledBrainrots(caseConfig) {
+  const items = caseConfig.drops.map(drop => ITEM_BY_ID[drop.itemId]);
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(randomUnit() * (i + 1));
     [items[i], items[j]] = [items[j], items[i]];
@@ -137,7 +137,7 @@ function shuffledBrainrots() {
   return items;
 }
 function renderCase(caseConfig) {
-  const preview = shuffledBrainrots();
+  const preview = Array.from({length:Math.ceil(12 / caseConfig.drops.length)}, () => shuffledBrainrots(caseConfig)).flat();
   const claim=state.freeClaims?.[caseConfig.id], unavailable=server && caseConfig.free && claim && (caseConfig.free==='subscribe' || server.now()<claim+86400000);
   return `<a class="back" href="#cases">${icon('arrow')}Все кейсы</a><section><div class="case-page-heading"><h1>${caseConfig.name}</h1></div>
     <div class="roulette" aria-label="Рулетка открытия кейса"><div class="roulette-track">${preview.map(i => itemCard(i, { eager:true })).join('')}</div><div class="roulette-selection"></div></div>
@@ -317,8 +317,8 @@ async function openCase(caseId) {
   setBusy(true); haptic('medium');
   const button = $('[data-action="open-case"]'); button.disabled = true; button.textContent = 'Открываем…';
   const track = $('.roulette-track');
-  // Decorative cards use the entire catalog; only the winning card uses case odds.
-  const sequence = [...shuffledBrainrots(), ...shuffledBrainrots()]; sequence[28] = item;
+  // Animate only this case's contents; the winning item is already determined.
+  const sequence = Array.from({length:Math.ceil(44 / c.drops.length)}, () => shuffledBrainrots(c)).flat(); sequence[28] = item;
   track.innerHTML = sequence.map(i => itemCard(i, { eager:true })).join('');
   const first = track.children[3], winner = track.children[28];
   const start = $('.roulette').clientWidth/2 - first.offsetLeft - first.offsetWidth/2;
