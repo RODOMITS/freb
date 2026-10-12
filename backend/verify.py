@@ -42,6 +42,9 @@ def verify_document(proof):
             if unit<cumulative:
                 outcome=row['itemId']
                 break
+    elif proof['game']=='slots':
+        pool=proof.get('itemIds',['67', 'lagrand', 'bananito', 'esok', 'ketupat', 'tictac', 'lavadorito', 'garama', 'eviledon', 'cash', 'pizza', 'burguro', 'capitano', 'cerberus', 'pegasus', 'guest666', 'cookie', 'fortunu', 'ketupatbro', 'foxini', 'venuspino', 'dragon'])
+        outcome=slots(1,list(pool),FairRandom(seed,proof['clientSeed'],proof['nonce']),proof.get('rtp',.85))['symbols']
     else:
         result=verify(seed,proof['clientSeed'],proof['nonce'],proof['game'],proof.get('caseId','plant'),proof.get('chance',.5),proof.get('bombCount',3),proof.get('rtp',.85))['result']
         outcome=result if proof['game']=='upgrade' else result['symbols'] if proof['game']=='slots' else result['bombs'] if proof['game']=='mines' else result['crash'] if proof['game']=='rocket' else result['itemId']

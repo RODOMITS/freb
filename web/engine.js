@@ -59,9 +59,9 @@ export function slotMultiplier(symbols) {
   const unique = new Set(symbols).size;
   return unique === 1 ? SLOT_RULES.tripleMultiplier : unique === 2 ? SLOT_RULES.pairMultiplier : 0;
 }
-export function rollSlots(betValue, unit = randomUnit(), draw = randomUnit, rules = SLOT_RULES) {
+export function rollSlots(betValue, unit = randomUnit(), draw = randomUnit, rules = SLOT_RULES, itemIds = ITEMS.map(item=>item.id)) {
   if (!Number.isSafeInteger(betValue) || betValue <= 0 || !Number.isFinite(unit) || unit < 0 || unit >= 1) throw new Error('Invalid slot bet or random unit');
-  const pool = ITEMS.map(item => item.id);
+  const pool = [...itemIds];
   function pick(list) {
     const n = draw();
     if (!Number.isFinite(n) || n < 0 || n >= 1) throw new Error('Invalid random unit');

@@ -43,6 +43,13 @@
       "image": "img/brainrots/tictac.webp"
     },
     {
+      "id": "queenbee",
+      "name": "Queen Bee",
+      "value": 58,
+      "rarity": "rare",
+      "image": "img/brainrots/Queen_Bee.webp"
+    },
+    {
       "id": "lavadorito",
       "name": "Lavadorito Spinito",
       "value": 60,
@@ -64,6 +71,20 @@
       "image": "img/brainrots/eviledon.webp"
     },
     {
+      "id": "boppin",
+      "name": "Boppin Bunny",
+      "value": 102,
+      "rarity": "epic",
+      "image": "img/brainrots/Boppin_Bunny.webp"
+    },
+    {
+      "id": "globa",
+      "name": "Globa Steppa",
+      "value": 131,
+      "rarity": "epic",
+      "image": "img/brainrots/Default_Globa_Steppa.webp"
+    },
+    {
       "id": "cash",
       "name": "Cash or Card",
       "value": 146,
@@ -76,6 +97,20 @@
       "value": 154,
       "rarity": "epic",
       "image": "img/brainrots/pizza.webp"
+    },
+    {
+      "id": "food",
+      "name": "La Food Combinasione",
+      "value": 170,
+      "rarity": "epic",
+      "image": "img/brainrots/La_Food_Combinasion.webp"
+    },
+    {
+      "id": "spooky",
+      "name": "Spooky and Pumpky",
+      "value": 170,
+      "rarity": "epic",
+      "image": "img/brainrots/Spooky_and_Pumpky.webp"
     },
     {
       "id": "burguro",
@@ -113,6 +148,20 @@
       "image": "img/brainrots/guest666.webp"
     },
     {
+      "id": "americano",
+      "name": "Capitano Americano",
+      "value": 340,
+      "rarity": "legendary",
+      "image": "img/brainrots/Capitano_Americano.webp"
+    },
+    {
+      "id": "breakfast",
+      "name": "La Breakfast Combinasione",
+      "value": 382,
+      "rarity": "legendary",
+      "image": "img/brainrots/La_Breakfast_Combinasion.webp"
+    },
+    {
       "id": "cookie",
       "name": "Cookie and Milki",
       "value": 385,
@@ -120,11 +169,39 @@
       "image": "img/brainrots/cookie.webp"
     },
     {
+      "id": "rosey",
+      "name": "Rosey and Teddy",
+      "value": 543,
+      "rarity": "legendary",
+      "image": "img/brainrots/Rosey_and_Teddy.webp"
+    },
+    {
+      "id": "bumbatron",
+      "name": "Bumbatron",
+      "value": 577,
+      "rarity": "legendary",
+      "image": "img/brainrots/Bumbatron.webp"
+    },
+    {
+      "id": "truckini",
+      "name": "Sammyni Truckini",
+      "value": 594,
+      "rarity": "legendary",
+      "image": "img/brainrots/Sammyni_Truckini.webp"
+    },
+    {
       "id": "fortunu",
       "name": "Fortunu and Cashuru",
       "value": 599,
       "rarity": "legendary",
       "image": "img/brainrots/fortunu.webp"
+    },
+    {
+      "id": "casaboo",
+      "name": "La Casa Boo",
+      "value": 645,
+      "rarity": "legendary",
+      "image": "img/brainrots/La_Casa_Boo.webp"
     },
     {
       "id": "ketupatbro",
@@ -148,403 +225,617 @@
       "image": "img/brainrots/venuspino.webp"
     },
     {
+      "id": "bunny",
+      "name": "Bunny and Eggy",
+      "value": 934,
+      "rarity": "secret",
+      "image": "img/brainrots/bunny.webp"
+    },
+    {
       "id": "dragon",
       "name": "Dragon Cannelloni",
       "value": 942,
       "rarity": "secret",
       "image": "img/brainrots/dragon.webp"
+    },
+    {
+      "id": "cakini",
+      "name": "Sammyni Cakini",
+      "value": 1104,
+      "rarity": "secret",
+      "image": "img/brainrots/Sammyni_Cakini.webp"
+    },
+    {
+      "id": "jellymoby",
+      "name": "Jelly Moby",
+      "value": 1189,
+      "rarity": "secret",
+      "image": "img/brainrots/jellymoby.webp"
+    },
+    {
+      "id": "ginger",
+      "name": "Ginger Gerat",
+      "value": 1528,
+      "rarity": "secret",
+      "image": "img/brainrots/Ginger_gerat.webp"
+    },
+    {
+      "id": "hydrabunny",
+      "name": "Hydra Bunny",
+      "value": 1953,
+      "rarity": "secret",
+      "image": "img/brainrots/hydrabunny.webp"
+    },
+    {
+      "id": "kraken",
+      "name": "Kraken",
+      "value": 2377,
+      "rarity": "secret",
+      "image": "img/brainrots/kraken.webp"
+    },
+    {
+      "id": "kalika",
+      "name": "Kalika Bros",
+      "value": 2547,
+      "rarity": "secret",
+      "image": "img/brainrots/Kalika_Bros.webp"
+    },
+    {
+      "id": "digi",
+      "name": "Digi Narwhal",
+      "value": 2632,
+      "rarity": "secret",
+      "image": "img/brainrots/digi.webp"
+    },
+    {
+      "id": "lasupr",
+      "name": "La Supreme Combinasione",
+      "value": 2802,
+      "rarity": "secret",
+      "image": "img/brainrots/lasupr.webp"
+    },
+    {
+      "id": "mobybros",
+      "name": "Moby Bros",
+      "value": 2802,
+      "rarity": "secret",
+      "image": "img/brainrots/mobybros.webp"
+    },
+    {
+      "id": "antonio",
+      "name": "Antonio",
+      "value": 4670,
+      "rarity": "secret",
+      "image": "img/brainrots/Antonio.webp"
+    },
+    {
+      "id": "lovebear",
+      "name": "Love Love Bear",
+      "value": 7387,
+      "rarity": "secret",
+      "image": "img/brainrots/lovebar.webp"
     }
   ],
   "cases": [
     {
-      "id": "plant",
-      "name": "Plant Party",
-      "price": 50,
-      "subtitle": "Маленький кейс. Большой вайб.",
-      "hue": 0,
-      "tag": "STARTER",
-      "image": "img/cases/plant.png",
-      "drops": [
-        {
-          "itemId": "bananito",
-          "baseChance": 0.48
-        },
-        {
-          "itemId": "foxini",
-          "baseChance": 0.27
-        },
-        {
-          "itemId": "burguro",
-          "baseChance": 0.15
-        },
-        {
-          "itemId": "capitano",
-          "baseChance": 0.07
-        },
-        {
-          "itemId": "venuspino",
-          "baseChance": 0.025
-        },
-        {
-          "itemId": "cerberus",
-          "baseChance": 0.005
-        }
-      ],
-      "theme": "Классика"
-    },
-    {
-      "id": "ocean",
-      "name": "Ocean Drive",
-      "price": 100,
-      "subtitle": "Поймай свою волну удачи.",
-      "hue": 90,
-      "tag": "FRESH",
-      "image": "img/cases/plant.png",
-      "drops": [
-        {
-          "itemId": "foxini",
-          "baseChance": 0.48
-        },
-        {
-          "itemId": "burguro",
-          "baseChance": 0.27
-        },
-        {
-          "itemId": "lavadorito",
-          "baseChance": 0.15
-        },
-        {
-          "itemId": "ketupatbro",
-          "baseChance": 0.07
-        },
-        {
-          "itemId": "dragon",
-          "baseChance": 0.025
-        },
-        {
-          "itemId": "garama",
-          "baseChance": 0.005
-        }
-      ],
-      "theme": "Классика"
-    },
-    {
-      "id": "miami",
-      "name": "Miami Vice",
-      "price": 250,
-      "subtitle": "Ночь, неон и редкие находки.",
-      "hue": 200,
-      "tag": "HOT",
-      "image": "img/cases/plant.png",
-      "drops": [
-        {
-          "itemId": "esok",
-          "baseChance": 0.48
-        },
-        {
-          "itemId": "capitano",
-          "baseChance": 0.27
-        },
-        {
-          "itemId": "venuspino",
-          "baseChance": 0.15
-        },
-        {
-          "itemId": "dragon",
-          "baseChance": 0.07
-        },
-        {
-          "itemId": "tictac",
-          "baseChance": 0.025
-        },
-        {
-          "itemId": "guest666",
-          "baseChance": 0.005
-        }
-      ],
-      "theme": "Классика"
-    },
-    {
-      "id": "sunset",
-      "name": "Golden Hour",
-      "price": 500,
-      "subtitle": "Для тех, кто целится выше.",
-      "hue": 310,
-      "tag": "PREMIUM",
-      "image": "img/cases/plant.png",
-      "drops": [
-        {
-          "itemId": "capitano",
-          "baseChance": 0.48
-        },
-        {
-          "itemId": "ketupatbro",
-          "baseChance": 0.27
-        },
-        {
-          "itemId": "dragon",
-          "baseChance": 0.15
-        },
-        {
-          "itemId": "fortunu",
-          "baseChance": 0.07
-        },
-        {
-          "itemId": "guest666",
-          "baseChance": 0.025
-        },
-        {
-          "itemId": "eviledon",
-          "baseChance": 0.005
-        }
-      ],
-      "theme": "Классика"
-    },
-    {
       "id": "sahur",
-      "name": "Sahur",
+      "name": "Утренний кейс",
       "price": 19,
-      "subtitle": "",
+      "theme": "Sahur",
       "hue": 0,
-      "tag": "",
       "image": "img/cases/sahur.png",
       "drops": [
         {
           "itemId": "67",
-          "baseChance": 0.33724637681159425
+          "baseChance": 0.3350078942637091
         },
         {
-          "itemId": "bananito",
-          "baseChance": 0.22
+          "itemId": "lagrand",
+          "baseChance": 0.16152166330571685
         },
         {
           "itemId": "esok",
-          "baseChance": 0.16
+          "baseChance": 0.07178740591365192
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.12
+          "baseChance": 0.29371552637333265
         },
         {
           "itemId": "tictac",
-          "baseChance": 0.1
+          "baseChance": 0.1129675101435895
         },
         {
           "itemId": "garama",
-          "baseChance": 0.06275362318840579
+          "baseChance": 0.025
         }
-      ],
-      "theme": "Sahur"
+      ]
     },
     {
-      "id": "fastfood",
-      "name": "Fastfood",
+      "id": "plant",
+      "name": "Банановый кейс",
       "price": 49,
-      "subtitle": "",
+      "theme": "Сад и зайцы",
       "hue": 0,
-      "tag": "",
-      "image": "img/cases/fastfood.png",
+      "image": "img/cases/plant.png",
       "drops": [
         {
           "itemId": "bananito",
-          "baseChance": 0.45
+          "baseChance": 0.44314859689784275
+        },
+        {
+          "itemId": "esok",
+          "baseChance": 0.21366093064717415
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.18
+          "baseChance": 0.09496041362096627
         },
         {
-          "itemId": "garama",
-          "baseChance": 0.14
+          "itemId": "boppin",
+          "baseChance": 0.15679953824211093
         },
         {
-          "itemId": "cash",
-          "baseChance": 0.12
+          "itemId": "globa",
+          "baseChance": 0.060307514708504206
         },
         {
-          "itemId": "pizza",
-          "baseChance": 0.08
+          "itemId": "food",
+          "baseChance": 0.024123005883401685
         },
         {
-          "itemId": "burguro",
-          "baseChance": 0.03
+          "itemId": "bunny",
+          "baseChance": 0.007
         }
-      ],
-      "theme": "Вкусный дроп"
-    },
-    {
-      "id": "cash",
-      "name": "Cash",
-      "price": 99,
-      "subtitle": "",
-      "hue": 0,
-      "tag": "",
-      "image": "img/cases/cash.png",
-      "drops": [
-        {
-          "itemId": "ketupat",
-          "baseChance": 0.55
-        },
-        {
-          "itemId": "lavadorito",
-          "baseChance": 0.23
-        },
-        {
-          "itemId": "cash",
-          "baseChance": 0.13
-        },
-        {
-          "itemId": "cookie",
-          "baseChance": 0.055
-        },
-        {
-          "itemId": "fortunu",
-          "baseChance": 0.025
-        },
-        {
-          "itemId": "dragon",
-          "baseChance": 0.01
-        }
-      ],
-      "theme": "Деньги"
-    },
-    {
-      "id": "olympus",
-      "name": "Olympus",
-      "price": 249,
-      "subtitle": "",
-      "hue": 0,
-      "tag": "",
-      "image": "img/cases/olympus.png",
-      "drops": [
-        {
-          "itemId": "eviledon",
-          "baseChance": 0.3
-        },
-        {
-          "itemId": "capitano",
-          "baseChance": 0.28
-        },
-        {
-          "itemId": "cerberus",
-          "baseChance": 0.17
-        },
-        {
-          "itemId": "guest666",
-          "baseChance": 0.12
-        },
-        {
-          "itemId": "fortunu",
-          "baseChance": 0.09
-        },
-        {
-          "itemId": "foxini",
-          "baseChance": 0.04
-        }
-      ],
-      "theme": "Мифы"
-    },
-    {
-      "id": "dragon",
-      "name": "Dragon",
-      "price": 499,
-      "subtitle": "",
-      "hue": 0,
-      "tag": "",
-      "image": "img/cases/dragon.png",
-      "drops": [
-        {
-          "itemId": "pegasus",
-          "baseChance": 0.37145953757225436
-        },
-        {
-          "itemId": "cookie",
-          "baseChance": 0.3
-        },
-        {
-          "itemId": "fortunu",
-          "baseChance": 0.16
-        },
-        {
-          "itemId": "ketupatbro",
-          "baseChance": 0.07
-        },
-        {
-          "itemId": "venuspino",
-          "baseChance": 0.045
-        },
-        {
-          "itemId": "dragon",
-          "baseChance": 0.05354046242774568
-        }
-      ],
-      "theme": "Мифы"
+      ]
     },
     {
       "id": "night",
-      "name": "Night Shift",
-      "price": 59,
-      "theme": "Ночная смена",
+      "name": "Призрачный кейс",
+      "price": 99,
+      "theme": "Тёмные брейнроты",
       "hue": 0,
       "image": "img/cases/night.png",
       "drops": [
         {
           "itemId": "esok",
-          "baseChance": 0.38
+          "baseChance": 0.48274269839401324
         },
         {
-          "itemId": "tictac",
-          "baseChance": 0.3
+          "itemId": "lavadorito",
+          "baseChance": 0.2327509438685421
         },
         {
           "itemId": "eviledon",
-          "baseChance": 0.2
+          "baseChance": 0.10344486394157425
         },
         {
           "itemId": "guest666",
-          "baseChance": 0.07
+          "baseChance": 0.1141555232970175
         },
         {
-          "itemId": "cerberus",
-          "baseChance": 0.04
+          "itemId": "americano",
+          "baseChance": 0.04390597049885289
         },
         {
-          "itemId": "foxini",
-          "baseChance": 0.01
+          "itemId": "casaboo",
+          "baseChance": 0.023
+        }
+      ]
+    },
+    {
+      "id": "fastfood",
+      "name": "Сытный кейс",
+      "price": 199,
+      "theme": "Еда и сладости",
+      "hue": 0,
+      "image": "img/cases/fastfood.png",
+      "drops": [
+        {
+          "itemId": "ketupat",
+          "baseChance": 0.4195533068018928
+        },
+        {
+          "itemId": "cash",
+          "baseChance": 0.2022846300651983
+        },
+        {
+          "itemId": "pizza",
+          "baseChance": 0.08990428002897702
+        },
+        {
+          "itemId": "burguro",
+          "baseChance": 0.03746011667874043
+        },
+        {
+          "itemId": "breakfast",
+          "baseChance": 0.16307609241819385
+        },
+        {
+          "itemId": "truckini",
+          "baseChance": 0.06272157400699764
+        },
+        {
+          "itemId": "ketupatbro",
+          "baseChance": 0.025
         }
       ]
     },
     {
       "id": "feast",
-      "name": "Пир",
-      "price": 129,
-      "theme": "Вкусный дроп",
+      "name": "Сладкий кейс",
+      "price": 399,
+      "theme": "Еда и сладости",
       "hue": 0,
       "image": "img/cases/feast.png",
       "drops": [
         {
-          "itemId": "ketupat",
-          "baseChance": 0.55
-        },
-        {
           "itemId": "pizza",
-          "baseChance": 0.22
+          "baseChance": 0.4535328840391171
         },
         {
-          "itemId": "burguro",
-          "baseChance": 0.13
+          "itemId": "spooky",
+          "baseChance": 0.21866764051886
         },
         {
           "itemId": "cookie",
-          "baseChance": 0.06
+          "baseChance": 0.09718561800838221
         },
         {
-          "itemId": "ketupatbro",
-          "baseChance": 0.03
+          "itemId": "rosey",
+          "baseChance": 0.16077667481318497
+        },
+        {
+          "itemId": "cakini",
+          "baseChance": 0.06183718262045576
+        },
+        {
+          "itemId": "lovebear",
+          "baseChance": 0.008
+        }
+      ]
+    },
+    {
+      "id": "cash",
+      "name": "Денежный кейс",
+      "price": 599,
+      "theme": "Братья и комбинации",
+      "hue": 0,
+      "image": "img/cases/cash.png",
+      "drops": [
+        {
+          "itemId": "cash",
+          "baseChance": 0.23128508423326136
+        },
+        {
+          "itemId": "capitano",
+          "baseChance": 0.111512451326751
+        },
+        {
+          "itemId": "bumbatron",
+          "baseChance": 0.04956108947855599
+        },
+        {
+          "itemId": "fortunu",
+          "baseChance": 0.42079654858325616
+        },
+        {
+          "itemId": "foxini",
+          "baseChance": 0.16184482637817546
+        },
+        {
+          "itemId": "kalika",
+          "baseChance": 0.025
+        }
+      ]
+    },
+    {
+      "id": "ocean",
+      "name": "Морской кейс",
+      "price": 699,
+      "theme": "Морские брейнроты",
+      "hue": 0,
+      "image": "img/cases/ocean.png",
+      "drops": [
+        {
+          "itemId": "garama",
+          "baseChance": 0.4584227042751636
+        },
+        {
+          "itemId": "capitano",
+          "baseChance": 0.22102523241838246
+        },
+        {
+          "itemId": "jellymoby",
+          "baseChance": 0.19210884114919505
+        },
+        {
+          "itemId": "kraken",
+          "baseChance": 0.07388801582661347
+        },
+        {
+          "itemId": "digi",
+          "baseChance": 0.02955520633064539
+        },
+        {
+          "itemId": "mobybros",
+          "baseChance": 0.025
+        }
+      ]
+    },
+    {
+      "id": "olympus",
+      "name": "Мифический кейс",
+      "price": 499,
+      "theme": "Мифы и боссы",
+      "hue": 0,
+      "image": "img/cases/olympus.png",
+      "drops": [
+        {
+          "itemId": "cerberus",
+          "baseChance": 0.41503788889078547
+        },
+        {
+          "itemId": "pegasus",
+          "baseChance": 0.20010755357234297
+        },
+        {
+          "itemId": "guest666",
+          "baseChance": 0.08893669047659687
+        },
+        {
+          "itemId": "foxini",
+          "baseChance": 0.19566290398797614
         },
         {
           "itemId": "dragon",
-          "baseChance": 0.01
+          "baseChance": 0.07525496307229852
+        },
+        {
+          "itemId": "hydrabunny",
+          "baseChance": 0.025
+        }
+      ]
+    },
+    {
+      "id": "dragon",
+      "name": "Драконий кейс",
+      "price": 1999,
+      "theme": "Мифы и боссы",
+      "hue": 0,
+      "image": "img/cases/dragon.png",
+      "drops": [
+        {
+          "itemId": "fortunu",
+          "baseChance": 0.3014257316487683
+        },
+        {
+          "itemId": "venuspino",
+          "baseChance": 0.14533026347351327
+        },
+        {
+          "itemId": "dragon",
+          "baseChance": 0.06459122821045032
+        },
+        {
+          "itemId": "digi",
+          "baseChance": 0.33486033870413806
+        },
+        {
+          "itemId": "lasupr",
+          "baseChance": 0.12879243796313003
+        },
+        {
+          "itemId": "lovebear",
+          "baseChance": 0.025
+        }
+      ]
+    },
+    {
+      "id": "miami",
+      "name": "Розовый кейс",
+      "price": 249,
+      "theme": "Сад и зайцы",
+      "hue": 0,
+      "image": "img/cases/miami.png",
+      "drops": [
+        {
+          "itemId": "bananito",
+          "baseChance": 0.4406576817575593
+        },
+        {
+          "itemId": "queenbee",
+          "baseChance": 0.2124599537045375
+        },
+        {
+          "itemId": "boppin",
+          "baseChance": 0.09442664609090554
+        },
+        {
+          "itemId": "rosey",
+          "baseChance": 0.1787180188783872
+        },
+        {
+          "itemId": "bunny",
+          "baseChance": 0.06873769956861046
+        },
+        {
+          "itemId": "lovebear",
+          "baseChance": 0.005
+        }
+      ]
+    },
+    {
+      "id": "sunset",
+      "name": "Золотой кейс",
+      "price": 1299,
+      "theme": "Братья и комбинации",
+      "hue": 0,
+      "image": "img/cases/sunset.png",
+      "drops": [
+        {
+          "itemId": "cash",
+          "baseChance": 0.43075677110281674
+        },
+        {
+          "itemId": "fortunu",
+          "baseChance": 0.20768630035314378
+        },
+        {
+          "itemId": "foxini",
+          "baseChance": 0.09230502237917501
+        },
+        {
+          "itemId": "venuspino",
+          "baseChance": 0.038460425991322926
+        },
+        {
+          "itemId": "lasupr",
+          "baseChance": 0.14862718012533557
+        },
+        {
+          "itemId": "antonio",
+          "baseChance": 0.057164300048205996
+        },
+        {
+          "itemId": "lovebear",
+          "baseChance": 0.025
+        }
+      ]
+    },
+    {
+      "id": "burrow",
+      "name": "Пасхальный кейс",
+      "price": 399,
+      "theme": "Сад и зайцы",
+      "hue": 0,
+      "image": "img/cases/burrow.png",
+      "drops": [
+        {
+          "itemId": "queenbee",
+          "baseChance": 0.48143334088895606
+        },
+        {
+          "itemId": "boppin",
+          "baseChance": 0.23211964650003236
+        },
+        {
+          "itemId": "americano",
+          "baseChance": 0.1031642873333477
+        },
+        {
+          "itemId": "bunny",
+          "baseChance": 0.12659307936720168
+        },
+        {
+          "itemId": "hydrabunny",
+          "baseChance": 0.04868964591046219
+        },
+        {
+          "itemId": "lovebear",
+          "baseChance": 0.008
+        }
+      ]
+    },
+    {
+      "id": "combination",
+      "name": "Сборный кейс",
+      "price": 799,
+      "theme": "Братья и комбинации",
+      "hue": 0,
+      "image": "img/cases/combination.png",
+      "drops": [
+        {
+          "itemId": "lagrand",
+          "baseChance": 0.38487928572918334
+        },
+        {
+          "itemId": "food",
+          "baseChance": 0.1855667984765705
+        },
+        {
+          "itemId": "breakfast",
+          "baseChance": 0.08247413265625356
+        },
+        {
+          "itemId": "ginger",
+          "baseChance": 0.23261317671077236
+        },
+        {
+          "itemId": "kalika",
+          "baseChance": 0.08946660642722015
+        },
+        {
+          "itemId": "lasupr",
+          "baseChance": 0.025
+        }
+      ]
+    },
+    {
+      "id": "heroes",
+      "name": "Героический кейс",
+      "price": 599,
+      "theme": "Герои",
+      "hue": 0,
+      "image": "img/cases/heroes.png",
+      "drops": [
+        {
+          "itemId": "queenbee",
+          "baseChance": 0.448284926859926
+        },
+        {
+          "itemId": "americano",
+          "baseChance": 0.21613737545032144
+        },
+        {
+          "itemId": "bumbatron",
+          "baseChance": 0.0960610557556984
+        },
+        {
+          "itemId": "cakini",
+          "baseChance": 0.15926201917459473
+        },
+        {
+          "itemId": "hydrabunny",
+          "baseChance": 0.06125462275945951
+        },
+        {
+          "itemId": "antonio",
+          "baseChance": 0.019
+        }
+      ]
+    },
+    {
+      "id": "bosses",
+      "name": "Тайный кейс",
+      "price": 1499,
+      "theme": "Мифы и боссы",
+      "hue": 0,
+      "image": "img/cases/bosses.png",
+      "drops": [
+        {
+          "itemId": "eviledon",
+          "baseChance": 0.2736513564138844
+        },
+        {
+          "itemId": "cerberus",
+          "baseChance": 0.13193904684240854
+        },
+        {
+          "itemId": "dragon",
+          "baseChance": 0.05863957637440378
+        },
+        {
+          "itemId": "hydrabunny",
+          "baseChance": 0.36888945915560795
+        },
+        {
+          "itemId": "kraken",
+          "baseChance": 0.14188056121369536
+        },
+        {
+          "itemId": "lovebear",
+          "baseChance": 0.025
         }
       ]
     }

@@ -374,7 +374,7 @@ class Service:
                 db.execute('INSERT INTO claims VALUES(?,?,?) ON CONFLICT(user_id,case_id) DO UPDATE SET claimed=excluded.claimed',(uid,case['id'],now))
             price=cents(case['price'])
             maximum=max(self.items[d['itemId']]['value'] for d in case['drops'])
-            self.limits.check(case['price'],maximum)
+            self.limits.check_case(case['price'],maximum)
             self.check_risk(db,maximum)
             if case.get('free'):
                 day=datetime.fromtimestamp(now,timezone.utc).strftime('%Y-%m-%d')
@@ -428,7 +428,7 @@ class Service:
             self.credit(state,cents(result['payout']))
             self.referral_result(db,uid,ident(),value,result['payout'])
             state['slotResult']=result
-            self.operation(db,uid,'slots','Слоты','win' if result['multiplier'] else 'lose',cents(result['payout']),f'Ставка {value} · ×{result["multiplier"]}',proof=dict(proof,rtp=RTP,outcome=result['symbols']))
+            self.operation(db,uid,'slots','Слоты','win' if result['multiplier'] else 'lose',cents(result['payout']),f'Ставка {value} · ×{result["multiplier"]}',proof=dict(proof,rtp=RTP,itemIds=list(self.items),outcome=result['symbols']))
             return result
         elif action=='mines-start':
             if state['mines'] and state['mines']['status']=='active':
