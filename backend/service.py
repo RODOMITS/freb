@@ -33,7 +33,7 @@ class Service:
         catalog = json.loads(Path(__file__).with_name('catalog.json').read_text(encoding='utf-8'))
         self.items = {item['id']:item for item in catalog['items']}
         self.cases = {case['id']:case for case in catalog['cases']}
-        for case_id, name, free, hue in [('daily','Daily Drop','daily',90),('subscribe','Channel Drop','subscribe',200)]:
+        for case_id, name, free, hue in [('daily','Бесплатный кейс','daily',90),('subscribe','Кейс за подписку','subscribe',200)]:
             self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,hue=hue,image='img/cases/plant.png',drops=[dict(itemId=i,baseChance=p) for i,p in [('67',.6),('lagrand',.25),('bananito',.1),('ketupat',.04),('garama',.01)]])
         for case in self.cases.values():
             distribution(case,self.items)
