@@ -142,7 +142,7 @@ function renderCase(caseConfig) {
   return `<a class="back" href="#cases">${icon('arrow')}Все кейсы</a><section><div class="case-page-heading"><h1>${caseConfig.name}</h1></div>
     <div class="roulette" aria-label="Рулетка открытия кейса"><div class="roulette-track">${preview.map(i => itemCard(i, { eager:true })).join('')}</div><div class="roulette-selection"></div></div>
     <div class="open-controls"><button class="primary" data-action="open-case" data-id="${caseConfig.id}" ${state.balance < caseConfig.price || unavailable ? 'disabled' : ''}>${icon('box')}${caseConfig.free ? unavailable ? caseConfig.free==='subscribe' ? 'Уже получен' : 'Доступен раз в 24 часа' : 'Открыть бесплатно' : `Открыть за <span class="coin">✦</span>${money(caseConfig.price)}`}</button>${fastButton()}</div>
-    ${state.balance < caseConfig.price ? '<div class="demo-banner" style="margin:-16px 0 24px;text-align:center">Не хватает BStars. <button data-action="topup" style="color:var(--pink)">Получить 100 бесплатно →</button></div>' : ''}
+    ${state.balance < caseConfig.price ? '<div class="demo-banner" style="margin:-16px 0 24px;text-align:center">Не хватает BStars. <button data-action="topup" style="color:var(--pink)">Пополнить баланс →</button></div>' : ''}
     <div class="contents-heading"><h2>Что внутри кейса</h2><button class="info-link" data-action="case-odds" data-id="${caseConfig.id}">Базовые шансы ⓘ</button></div><div class="item-grid">${caseConfig.drops.map(d => itemCard(ITEM_BY_ID[d.itemId], { chance: d.baseChance })).join('')}</div>
     </section>`;
 }
