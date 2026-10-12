@@ -545,8 +545,9 @@ function runServerRocket() {
   }
   serverRocketFrame=requestAnimationFrame(frame);
 }
+function walletCard(item,options) { return itemCard(item,options).replace('<button ','<button type="button" '); }
 function depositDialog() {
-  openModal(`<div class="modal-content"><h2>Пополнение</h2><form id="deposit-form" class="admin-form"><label>Брейнрот для депозита<select name="itemId">${ITEMS.filter(i=>i.value>=25).map(i=>`<option value="${i.id}">${esc(i.name)} · ${money(i.value)} BStars</option>`).join('')}</select></label><button class="primary">Создать заявку</button></form><p>Передай предмет владельцу в игре. BStars начислятся после подтверждения.</p><form id="stars-form" class="admin-form"><label>Telegram Stars<input name="stars" type="number" min="1" max="10000" step="1" required value="100"></label><p>1 Star = 1,5 BStars<br>После оплаты Stars вывод предметов ограничен на ${money(server.config.starsHoldHours/24)} дней. Игры и продажа внутри сайта доступны.</p>${server.config.paymentsEnabled ? `<label class="purchase-consent"><input type="checkbox" name="terms" required>Принимаю <a href="${esc(server.config.termsUrl)}" target="_blank" rel="noopener">условия покупки</a> и срок ограничения вывода</label><button class="primary">Оплатить звёздами</button>` : '<p>Оплата звёздами ещё не включена.</p>'}</form></div>`);
+  openModal(`<div class="modal-content wallet-modal"><h2>Пополнение</h2><p>Выбери брейнрота для депозита</p><form id="deposit-form" class="wallet-deposit-form"><input type="hidden" name="itemId" value=""><div class="item-grid wallet-item-grid" aria-label="Брейнроты для депозита">${ITEMS.filter(i=>i.value>=25).map(i=>walletCard(i,{action:'select-deposit',id:i.id,selected:false})).join('')}</div><div class="wallet-selection"><span id="deposit-summary">Предмет не выбран</span><button class="primary" id="deposit-submit" disabled>Создать заявку</button></div></form><p>Передай предмет владельцу в игре. BStars начислятся после подтверждения.</p><form id="stars-form" class="admin-form wallet-stars"><label>Telegram Stars<input name="stars" type="number" min="1" max="10000" step="1" required value="100"></label><p>1 Star = 1,5 BStars<br>После оплаты Stars вывод предметов ограничен на ${money(server.config.starsHoldHours/24)} дней. Игры и продажа внутри сайта доступны.</p>${server.config.paymentsEnabled ? `<label class="purchase-consent"><input type="checkbox" name="terms" required>Принимаю <a href="${esc(server.config.termsUrl)}" target="_blank" rel="noopener">условия покупки</a> и срок ограничения вывода</label><button class="primary">Оплатить звёздами</button>` : '<p>Оплата звёздами ещё не включена.</p>'}</form></div>`);
 }
 let withdrawUids=new Set();
 function withdrawalDialog() {
@@ -555,7 +556,7 @@ function withdrawalDialog() {
   }
   const eligible=state.inventory.filter(e=>['ketupat','garama','cerberus','dragon'].includes(e.itemId));
   withdrawUids=new Set();
-  openModal(`<div class="modal-content"><h2>Вывод брейнротов</h2><p>Выбери предметы. До решения администратора они будут заблокированы.</p><div class="item-grid withdrawal-grid">${eligible.map(e=>itemCard(ITEM_BY_ID[e.itemId],{action:'withdraw-select',id:e.uid})).join('')}</div>${eligible.length ? '<button class="primary" data-action="withdraw-submit">Создать заявку</button>' : '<p>Для вывода нужны Ketupat Kepat, Garama, Cerberus или Dragon Cannelloni.</p>'}</div>`);
+  openModal(`<div class="modal-content wallet-modal"><h2>Вывод брейнротов</h2><p>Выбери предметы. До решения администратора они будут заблокированы.</p><div class="item-grid wallet-item-grid" aria-label="Предметы для вывода">${eligible.map(e=>walletCard(ITEM_BY_ID[e.itemId],{action:'select-withdraw',id:e.uid,selected:false})).join('')}</div>${eligible.length ? '<div class="wallet-selection"><span id="withdraw-summary">Выбрано: 0 · ✦ 0</span><button class="primary" data-action="withdraw-submit" disabled>Создать заявку</button></div>' : '<p>Для вывода нужны Ketupat Kepat, Garama, Cerberus или Dragon Cannelloni.</p>'}</div>`);
 }
 function ownerContact(requestId) {
   openModal(`<div class="modal-content"><h2>Заявка создана</h2><p>Номер: ${esc(requestId)}. Отправь его владельцу.</p><a class="primary" href="${esc(server.config.ownerUrl)}" target="_blank" rel="noopener">Открыть личные сообщения</a></div>`);
@@ -669,7 +670,16 @@ document.addEventListener('click', event => {
     case 'confirm-sell': sell(id); break;
     case 'topup': topup(); break;
     case 'withdraw': if(server) withdrawalDialog(); else openModal('<div class="modal-content"><div class="modal-status-icon">↗</div><h2>Вывод</h2><p>Вывод пока недоступен.</p><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button></div></div>'); break;
-    case 'withdraw-select': withdrawUids.has(id) ? withdrawUids.delete(id) : withdrawUids.add(id); button.classList.toggle('selected',withdrawUids.has(id)); button.setAttribute('aria-pressed',String(withdrawUids.has(id))); break;
+    case 'select-deposit': {
+      if(!ITEM_BY_ID[id] || ITEM_BY_ID[id].value<25) break;
+      document.querySelectorAll('[data-action="select-deposit"]').forEach(card=>{const selected=card.dataset.id===id;card.classList.toggle('selected',selected);card.setAttribute('aria-pressed',String(selected));card.querySelector('.selected-check')?.remove();if(selected)card.insertAdjacentHTML('afterbegin','<span class="selected-check">✓</span>');});
+      $('#deposit-form').elements.namedItem('itemId').value=id;$('#deposit-summary').textContent=`${ITEM_BY_ID[id].name} · ✦ ${money(ITEM_BY_ID[id].value)}`;$('#deposit-submit').disabled=false;break;
+    }
+    case 'select-withdraw': {
+      withdrawUids.has(id) ? withdrawUids.delete(id) : withdrawUids.add(id);
+      const selected=withdrawUids.has(id);button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));button.querySelector('.selected-check')?.remove();if(selected)button.insertAdjacentHTML('afterbegin','<span class="selected-check">✓</span>');
+      const value=state.inventory.filter(e=>withdrawUids.has(e.uid)).reduce((sum,e)=>sum+ITEM_BY_ID[e.itemId].value,0);$('#withdraw-summary').textContent=`Выбрано: ${withdrawUids.size} · ✦ ${money(value)}`;$('[data-action="withdraw-submit"]').disabled=!withdrawUids.size;break;
+    }
     case 'withdraw-submit': void serverAction('withdraw',{uids:[...withdrawUids]}).then(r=>{if(r){render();ownerContact(r.result.requestId);}}); break;
     case 'transfer-approve': case 'transfer-reject': void serverAction('admin-transfer',{requestId:id,decision:action==='transfer-approve' ? 'approve' : 'reject'}).then(r=>{if(r)render();}); break;
     case 'balance': if(server) depositDialog(); else openModal(`<div class="modal-content"><h2>Баланс</h2><div class="result-value">✦ ${money(state.balance)} BStars</div><div class="modal-actions"><button class="primary" data-action="topup">Пополнить +100</button><button class="secondary" data-action="goto-profile">В профиль</button></div></div>`); break;
