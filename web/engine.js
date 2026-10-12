@@ -1,6 +1,6 @@
 import { SETTINGS, ITEM_BY_ID, ITEMS, SLOT_RULES } from './config.js';
 
-// Nominal drop weights are shown in the catalog. To obtain exact 85% EV,
+// Nominal drop weights are shown in the catalog. To obtain configured EV,
 // blend them with the cheapest outcome. No post-roll swaps or near-miss rigging.
 export function distribution(caseConfig) {
   const nominal = caseConfig.drops.map(d => ({ ...d, value: ITEM_BY_ID[d.itemId].value }));
@@ -59,7 +59,7 @@ export function slotMultiplier(symbols) {
   const unique = new Set(symbols).size;
   return unique === 1 ? SLOT_RULES.tripleMultiplier : unique === 2 ? SLOT_RULES.pairMultiplier : 0;
 }
-export function rollSlots(betValue, unit = randomUnit(), draw = randomUnit) {
+export function rollSlots(betValue, unit = randomUnit(), draw = randomUnit, rules = SLOT_RULES) {
   if (!Number.isSafeInteger(betValue) || betValue <= 0 || !Number.isFinite(unit) || unit < 0 || unit >= 1) throw new Error('Invalid slot bet or random unit');
   const pool = ITEMS.map(item => item.id);
   function pick(list) {
@@ -68,7 +68,7 @@ export function rollSlots(betValue, unit = randomUnit(), draw = randomUnit) {
     return list.splice(Math.floor(n*list.length),1)[0];
   }
   const a = pick(pool), b = pick(pool), c = pick(pool);
-  const symbols = unit < SLOT_RULES.tripleChance ? [a,a,a] : unit < SLOT_RULES.tripleChance+SLOT_RULES.pairChance ? [a,a,b] : [a,b,c];
+  const symbols = unit < rules.tripleChance ? [a,a,a] : unit < rules.tripleChance+rules.pairChance ? [a,a,b] : [a,b,c];
   const shuffled = [];
   while (symbols.length) shuffled.push(pick(symbols));
   const multiplier = slotMultiplier(shuffled);
@@ -130,14 +130,14 @@ export function adjustBalance(state, amount, direction, reason='') {
   if (state.balance+delta<0) throw new Error('Списание превышает баланс.');
   return recordOperation({...state,balance:Math.round((state.balance+delta)*100)/100},{type:'admin',title:delta>0 ? 'Начисление администратором' : 'Списание администратором',detail:String(reason).trim().slice(0,120) || 'Изменение баланса',delta});
 }
-export function minesMultiplier(bombs, opened) {
+export function minesMultiplier(bombs, opened, rtp = SETTINGS.rtp) {
   if (![3,5,10].includes(bombs) || !Number.isInteger(opened) || opened<0 || opened>25-bombs) throw new Error('Некорректные параметры мин.');
   if (!opened) return 0;
   let survival = 1;
   for (let i=0;i<opened;i++) survival *= (25-bombs-i)/(25-i);
-  return SETTINGS.rtp/survival;
+  return rtp/survival;
 }
-export function minesPayout(game) { return Math.round(game.stakeValue*minesMultiplier(game.bombCount,game.opened.length)*100)/100; }
+export function minesPayout(game) { return Math.round(game.stakeValue*minesMultiplier(game.bombCount,game.opened.length,game.rtp || SETTINGS.rtp)*100)/100; }
 function validMines(game) {
   if (!game) return false;
   return typeof game.id==='string' && ['active','lost','won'].includes(game.status) && [3,5,10].includes(game.bombCount) && Array.isArray(game.bombs) && game.bombs.length===game.bombCount && new Set(game.bombs).size===game.bombCount && game.bombs.every(n=>Number.isInteger(n)&&n>=0&&n<25) && Array.isArray(game.opened) && new Set(game.opened).size===game.opened.length && game.opened.every(n=>Number.isInteger(n)&&n>=0&&n<25&&!game.bombs.includes(n)) && Number.isSafeInteger(game.stakeValue) && game.stakeValue>0 && Number.isFinite(game.payout) && game.payout>=0 && (game.status==='lost' ? game.bombs.includes(game.hit) : true);

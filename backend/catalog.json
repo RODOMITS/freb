@@ -189,7 +189,8 @@
           "itemId": "cerberus",
           "baseChance": 0.005
         }
-      ]
+      ],
+      "theme": "Классика"
     },
     {
       "id": "ocean",
@@ -224,7 +225,8 @@
           "itemId": "garama",
           "baseChance": 0.005
         }
-      ]
+      ],
+      "theme": "Классика"
     },
     {
       "id": "miami",
@@ -259,7 +261,8 @@
           "itemId": "guest666",
           "baseChance": 0.005
         }
-      ]
+      ],
+      "theme": "Классика"
     },
     {
       "id": "sunset",
@@ -294,7 +297,8 @@
           "itemId": "eviledon",
           "baseChance": 0.005
         }
-      ]
+      ],
+      "theme": "Классика"
     },
     {
       "id": "sahur",
@@ -307,29 +311,30 @@
       "drops": [
         {
           "itemId": "67",
-          "baseChance": 0.16666666666666666
-        },
-        {
-          "itemId": "lagrand",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.33724637681159425
         },
         {
           "itemId": "bananito",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.22
         },
         {
           "itemId": "esok",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.16
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.12
         },
         {
           "itemId": "tictac",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.1
+        },
+        {
+          "itemId": "garama",
+          "baseChance": 0.06275362318840579
         }
-      ]
+      ],
+      "theme": "Sahur"
     },
     {
       "id": "fastfood",
@@ -342,29 +347,30 @@
       "drops": [
         {
           "itemId": "bananito",
-          "baseChance": 0.16666666666666666
-        },
-        {
-          "itemId": "esok",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.45
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.18
+        },
+        {
+          "itemId": "garama",
+          "baseChance": 0.14
         },
         {
           "itemId": "cash",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.12
         },
         {
           "itemId": "pizza",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.08
         },
         {
           "itemId": "burguro",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.03
         }
-      ]
+      ],
+      "theme": "Вкусный дроп"
     },
     {
       "id": "cash",
@@ -377,29 +383,30 @@
       "drops": [
         {
           "itemId": "ketupat",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.55
         },
         {
           "itemId": "lavadorito",
-          "baseChance": 0.16666666666666666
-        },
-        {
-          "itemId": "garama",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.23
         },
         {
           "itemId": "cash",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.13
         },
         {
           "itemId": "cookie",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.055
         },
         {
           "itemId": "fortunu",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.025
+        },
+        {
+          "itemId": "dragon",
+          "baseChance": 0.01
         }
-      ]
+      ],
+      "theme": "Деньги"
     },
     {
       "id": "olympus",
@@ -412,29 +419,30 @@
       "drops": [
         {
           "itemId": "eviledon",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.3
         },
         {
           "itemId": "capitano",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.28
         },
         {
           "itemId": "cerberus",
-          "baseChance": 0.16666666666666666
-        },
-        {
-          "itemId": "pegasus",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.17
         },
         {
           "itemId": "guest666",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.12
+        },
+        {
+          "itemId": "fortunu",
+          "baseChance": 0.09
         },
         {
           "itemId": "foxini",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.04
         }
-      ]
+      ],
+      "theme": "Мифы"
     },
     {
       "id": "dragon",
@@ -446,28 +454,97 @@
       "image": "img/cases/dragon.png",
       "drops": [
         {
-          "itemId": "burguro",
-          "baseChance": 0.16666666666666666
-        },
-        {
           "itemId": "pegasus",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.37145953757225436
         },
         {
           "itemId": "cookie",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.3
         },
         {
           "itemId": "fortunu",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.16
+        },
+        {
+          "itemId": "ketupatbro",
+          "baseChance": 0.07
         },
         {
           "itemId": "venuspino",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.045
         },
         {
           "itemId": "dragon",
-          "baseChance": 0.16666666666666666
+          "baseChance": 0.05354046242774568
+        }
+      ],
+      "theme": "Мифы"
+    },
+    {
+      "id": "night",
+      "name": "Night Shift",
+      "price": 59,
+      "theme": "Ночная смена",
+      "hue": 0,
+      "image": "img/cases/night.png",
+      "drops": [
+        {
+          "itemId": "esok",
+          "baseChance": 0.38
+        },
+        {
+          "itemId": "tictac",
+          "baseChance": 0.3
+        },
+        {
+          "itemId": "eviledon",
+          "baseChance": 0.2
+        },
+        {
+          "itemId": "guest666",
+          "baseChance": 0.07
+        },
+        {
+          "itemId": "cerberus",
+          "baseChance": 0.04
+        },
+        {
+          "itemId": "foxini",
+          "baseChance": 0.01
+        }
+      ]
+    },
+    {
+      "id": "feast",
+      "name": "Пир",
+      "price": 129,
+      "theme": "Вкусный дроп",
+      "hue": 0,
+      "image": "img/cases/feast.png",
+      "drops": [
+        {
+          "itemId": "ketupat",
+          "baseChance": 0.55
+        },
+        {
+          "itemId": "pizza",
+          "baseChance": 0.22
+        },
+        {
+          "itemId": "burguro",
+          "baseChance": 0.13
+        },
+        {
+          "itemId": "cookie",
+          "baseChance": 0.06
+        },
+        {
+          "itemId": "ketupatbro",
+          "baseChance": 0.03
+        },
+        {
+          "itemId": "dragon",
+          "baseChance": 0.01
         }
       ]
     }

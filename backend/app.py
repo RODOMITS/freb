@@ -9,6 +9,7 @@ import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import parse_qsl
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -28,6 +29,7 @@ WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET','')
 PUBLIC_URL = os.getenv('PUBLIC_URL','').rstrip('/')
 OWNER_ID = int(os.getenv('OWNER_ID','7613236278'))
 OWNER_USERNAME = os.getenv('OWNER_USERNAME','DarkMonstep').lstrip('@')
+BOT_USERNAME=os.getenv('BOT_USERNAME','').lstrip('@')
 CHANNEL = int(os.getenv('SUBSCRIPTION_CHANNEL','-1003739017107'))
 TERMS_URL = os.getenv('TERMS_URL','')
 PRIVACY_URL = os.getenv('PRIVACY_URL','')
@@ -90,12 +92,14 @@ async def backups():
 
 
 async def configure_telegram():
+    global BOT_USERNAME
     if os.getenv('AUTO_SETUP_TELEGRAM','false').lower()!='true' or not BOT_TOKEN:
         return
     if not PUBLIC_URL.startswith('https://') or not WEBHOOK_SECRET:
         raise RuntimeError('PUBLIC_URL and webhook secret are required for automatic setup')
     while True:
         try:
+            BOT_USERNAME=(await telegram('getMe',{}))['username']
             await telegram('setWebhook',dict(url=PUBLIC_URL+'/webhook',secret_token=WEBHOOK_SECRET,allowed_updates=['message','pre_checkout_query'],drop_pending_updates=False))
             await telegram('setChatMenuButton',dict(menu_button=dict(type='web_app',text='Открыть Freebie',web_app=dict(url=PUBLIC_URL))))
             log.info('Telegram webhook and menu configured')
@@ -199,7 +203,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',botUsername=BOT_USERNAME,rtp=.90,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -244,7 +248,7 @@ async def auth(request: Request):
     rate_limit(('auth',request.client.host),30,60)
     body=await object_body(request)
     user=validate_init_data(str(body.get('initData','')),BOT_TOKEN)
-    return dict(token=service.login(user))
+    return dict(token=service.login(user,dict(parse_qsl(str(body.get('initData','')))).get('start_param','')))
 
 
 @app.get('/api/state')
@@ -379,17 +383,20 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
     chat=message.get('chat',{}).get('id')
     if text in ('/start','/support','/paysupport','/terms') and chat:
         if text=='/start':
+            parts=message.get('text','').split(maxsplit=1)
+            if message.get('chat',{}).get('type')=='private' and len(parts)==2 and message.get('from',{}).get('id')==chat:
+                service.login(message['from'],parts[1].strip())
             welcome=('<tg-emoji emoji-id="5298585940577525950">🤩</tg-emoji> '
                      '<b>Добро пожаловать в Brainrot Freebie!</b>\n\n'
                      'Кейсы с брейнротами, ежедневные бонусы и бесплатный кейс за подписку.\n'
-                     '<b>85% RTP · Provably Fair</b>')
+                     '<b>90% RTP · Provably Fair</b>')
             buttons=[]
             if PUBLIC_URL.startswith('https://'):
                 buttons.append([dict(text='Играть',web_app=dict(url=PUBLIC_URL))])
-            buttons.append([dict(text='Новости',url='https://t.me/brainrotFreebie')])
+            buttons.append([dict(text='Новости',url='https://t.me/brainrotFreebie'),dict(text='Поддержка',url=f'https://t.me/{OWNER_USERNAME}')])
             reply=dict(chat_id=chat,text=welcome,parse_mode='HTML',reply_markup=dict(inline_keyboard=buttons))
         else:
-            reply=dict(chat_id=chat,text=f'Поддержка: @{OWNER_USERNAME}\nУсловия: {TERMS_URL or "Условия покупки ещё не опубликованы"}')
+            reply=dict(chat_id=chat,text='Поддержка Brainrot Freebie\nОпиши проблему и приложи номер операции из истории. Не отправляй пароль или код входа Telegram.',reply_markup=dict(inline_keyboard=[[dict(text='Написать в поддержку',url=f'https://t.me/{OWNER_USERNAME}')]]))
         try:
             await telegram('sendMessage',reply)
         except HTTPException:
@@ -406,7 +413,7 @@ def index():
 # Explicit allowlist: never serve .env, databases, backend source or archives.
 def file_handler(filename):
     def handler():
-        return FileResponse(WEB_ROOT/filename)
+        return FileResponse(WEB_ROOT/filename,headers={'Cache-Control':'no-cache'})
     return handler
 
 

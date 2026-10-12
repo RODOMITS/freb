@@ -6,10 +6,10 @@ import re
 import secrets
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from .economy import cents, crash_point, distribution, landing, mines_multiplier, roll_case, slots
+from .economy import RTP, cents, crash_point, distribution, landing, mines_multiplier, roll_case, slots
 from .fair import FairRandom, commitment, new_seed
 from .store import Store, load_user, save_user
 from .risk import Limits
@@ -35,19 +35,60 @@ class Service:
         self.cases = {case['id']:case for case in catalog['cases']}
         for case_id, name, free, hue in [('daily','Бесплатный кейс','daily',0),('subscribe','Кейс за подписку','subscribe',0)]:
             self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,hue=hue,image='img/cases/daily.png' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
+        for case_id,name in [('referral','За приглашение'),('nickname','За ник')]:
+            self.cases[case_id]=dict(id=case_id,name=name,price=0,free=case_id,theme='Бесплатные',hue=0,image='img/cases/'+case_id+'.png',drops=[dict(itemId=i,baseChance=p) for i,p in [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)]])
         for case in self.cases.values():
             distribution(case,self.items)
 
-    def login(self, user):
+    def login(self, user, start_param=""):
+
         uid, now = user['id'], self.clock()
         with self.store.tx() as db:
             state = dict(version=1,balance=self.starting_balance,debt=0,inventory=[],stats=dict(opened=0,upgrades=0,wins=0),mines=None,rocket=None,slotResult=None)
+            fresh=not db.execute('SELECT 1 FROM users WHERE id=?',(uid,)).fetchone()
+            code='u'+str(uid)
+            db.execute('INSERT OR IGNORE INTO partners(user_id,code) VALUES(?,?)',(uid,code))
+            db.execute('INSERT OR IGNORE INTO referral_codes VALUES(?,?)',(code,uid))
+            if fresh and start_param.startswith('ref_'):
+                parent=db.execute('SELECT user_id FROM referral_codes WHERE code=?',(start_param[4:].lower(),)).fetchone()
+                if parent and parent['user_id']!=uid:
+                    db.execute('INSERT OR IGNORE INTO referrals VALUES(?,?,?)',(uid,parent['user_id'],now))
             db.execute('INSERT OR IGNORE INTO users(id,profile,state,seed,client) VALUES(?,?,?,?,?)', (uid,json.dumps(user),json.dumps(state),new_seed(),secrets.token_hex(16)))
             db.execute('UPDATE users SET profile=? WHERE id=?', (json.dumps(user),uid))
             token = secrets.token_urlsafe(32)
             db.execute('INSERT INTO sessions VALUES(?,?,?)',(hashlib.sha256(token.encode()).hexdigest(),uid,now+86400))
             db.execute('DELETE FROM sessions WHERE expires<?',(now,))
         return token
+
+    @staticmethod
+    def withdrawal_open(now):
+        msk=datetime.fromtimestamp(now,timezone(timedelta(hours=3)))
+        return msk.weekday()==5 and msk.hour==16
+
+    def referral_result(self, db, uid, event_id, stake, payout):
+        funded=db.execute("SELECT 1 FROM invoices WHERE user_id=? AND status='paid' UNION ALL SELECT 1 FROM transfers WHERE user_id=? AND kind='deposit' AND status='approved' LIMIT 1",(uid,uid)).fetchone()
+        if funded and db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone():
+            db.execute('INSERT OR IGNORE INTO referral_ledger VALUES(?,?,?)',(event_id,uid,cents(stake)-cents(payout)))
+
+    def partner(self, db, uid):
+        account=db.execute('SELECT * FROM partners WHERE user_id=?',(uid,)).fetchone()
+        if not account:
+            code='u'+str(uid)
+            db.execute('INSERT INTO partners(user_id,code) VALUES(?,?)',(uid,code))
+            db.execute('INSERT OR IGNORE INTO referral_codes VALUES(?,?)',(code,uid))
+            account=db.execute('SELECT * FROM partners WHERE user_id=?',(uid,)).fetchone()
+        people=db.execute('SELECT invitee FROM referrals WHERE inviter=?',(uid,)).fetchall()
+        net=0
+        for person in people:
+            who=person['invitee']
+            paid=db.execute("SELECT coalesce(sum(stars),0)*150 FROM invoices WHERE user_id=? AND status='paid'",(who,)).fetchone()[0]
+            paid+=sum(cents(json.loads(r['data'])['value']) for r in db.execute("SELECT data FROM transfers WHERE user_id=? AND kind='deposit' AND status='approved'",(who,)))
+            loss=db.execute('SELECT coalesce(sum(net),0) FROM referral_ledger WHERE invitee=?',(who,)).fetchone()[0]
+            # Carry wins forward and cap eligible losses by confirmed funding.
+            net+=min(loss,paid)
+        earned=max(0,net)*40//100
+        available=max(0,earned-account['claimed'])
+        return dict(code=account['code'],count=len(people),earned=earned/100,claimed=account['claimed']/100,available=available/100,availableCents=available)
 
     def authenticate(self, token):
         with self.store.tx() as db:
@@ -132,7 +173,7 @@ class Service:
             seed, round_id = new_seed(), ident()
             crash = crash_point(FairRandom(seed,round_id,0).draw())
             start = (self.clock()+10)*1000
-            game = dict(id=round_id,seed=seed,serverHash=commitment(seed),clientSeed=round_id,startAt=start,endAt=start+math.log(crash)/.24*1000,crash=crash,capped=crash>=100,maxTotalStake=self.limits.rocket_round_stake)
+            game = dict(id=round_id,rtp=RTP,seed=seed,serverHash=commitment(seed),clientSeed=round_id,startAt=start,endAt=start+math.log(crash)/.24*1000,crash=crash,capped=crash>=100,maxTotalStake=self.limits.rocket_round_stake)
             db.execute('INSERT INTO rounds VALUES(?,?)',(round_id,json.dumps(game)))
         return game
 
@@ -161,9 +202,10 @@ class Service:
 
     def finish_mines(self, db, uid, state, win, reason=''):
         game = state['mines']
-        payout = cents(game['stakeValue']*mines_multiplier(game['bombCount'],len(game['opened']))) if win else 0
+        payout = cents(game['stakeValue']*mines_multiplier(game['bombCount'],len(game['opened']),game.get('rtp',.85))) if win else 0
         game.update(status='won' if win else 'lost',payout=payout/100)
         self.credit(state,payout)
+        self.referral_result(db,uid,game['id'],game['stakeValue'],payout/100)
         self.operation(db,uid,'mines','Мины','win' if win else 'lose',payout,f'{reason} · ставка {game["stakeValue"]} · открыто {len(game["opened"])} · выплата {payout/100}',op_id=game['id'])
 
     def finish_rocket(self, db, uid, state, multiplier, automatic):
@@ -172,12 +214,20 @@ class Service:
         game.update(status='won' if multiplier else 'lost',cashAt=multiplier,payout=payout/100,automatic=automatic)
         self.credit(state,payout)
         detail = f'{"Автозабор" if automatic else "Забор"} ×{multiplier:.2f} · ставка {game["stakeValue"]} · выплата {payout/100}' if multiplier else f'Взрыв ×{math.floor(game["crash"]*100)/100:.2f}'
+        self.referral_result(db,uid,game['id'],game['stakeValue'],payout/100)
         self.operation(db,uid,'rocket','Ракетка','win' if multiplier else 'lose',payout,detail,op_id=game['id'])
 
     def snapshot(self, db, uid, history_limit=200):
         row, state = load_user(db,uid)
         result = copy.deepcopy(state)
         result['balance'] /= 100
+        result['partner']=self.partner(db,uid)
+        result['partner'].pop('availableCents',None)
+        result['withdrawalOpen']=self.withdrawal_open(self.clock())
+        result['pendingInventory']=[dict(e,requestId=r['id'],status='withdrawing') for r in db.execute("SELECT id,data FROM transfers WHERE user_id=? AND kind='withdraw' AND status='pending'",(uid,)) for e in json.loads(r['data'])['entries']]
+        today=datetime.fromtimestamp(self.clock(),timezone(timedelta(hours=3))).replace(hour=0,minute=0,second=0,microsecond=0).timestamp()
+        drops=[dict(json.loads(r['detail']),created=r['created']) for r in db.execute("SELECT detail,created FROM audit WHERE action='drop' AND created>=?",(today,))]
+        result['topDrop']=max(drops,key=lambda d:self.items.get(d['itemId'],{}).get('value',0)) if drops else None
         result['debt']=state.get('debt',0)/100
         result['withdrawHeldUntil']=self.withdraw_hold(db,uid)*1000
         result['refundReviewPending']=bool(db.execute("SELECT 1 FROM invoices WHERE user_id=? AND status='refund_requested'",(uid,)).fetchone())
@@ -260,22 +310,67 @@ class Service:
 
     def execute(self, db, uid, state, action, b):
         now = self.clock()
-        if state.get('debt',0)>0 and action not in ('deposit','fair-rotate') and not action.startswith('admin-'):
+        if state.get('debt',0)>0 and action not in ('deposit','fair-rotate','withdraw-cancel') and not action.startswith('admin-'):
             raise ValueError('Есть задолженность после возврата платежа. Обратись в поддержку.')
         if action in ('case','upgrade','slots','mines-start','rocket-bet'):
             control=db.execute("SELECT value FROM controls WHERE name='paused'").fetchone()
             if control and control['value']:
                 raise ValueError('Приём новых ставок временно приостановлен. Активные игры продолжаются.')
+        if action=='withdraw-cancel':
+            row=db.execute("SELECT * FROM transfers WHERE id=? AND user_id=? AND kind IN ('withdraw','partner-withdraw') AND status='pending'",(str(b.get('requestId')),uid)).fetchone()
+            if not row:
+                raise ValueError('Заявка уже обработана или не найдена')
+            data=json.loads(row['data'])
+            if row['kind']=='withdraw':
+                state['inventory'].extend(data['entries'])
+            else:
+                db.execute('UPDATE partners SET claimed=claimed-? WHERE user_id=?',(cents(data['value']),uid))
+            db.execute("UPDATE transfers SET status='cancelled' WHERE id=?",(row['id'],))
+            self.operation(db,uid,row['kind'],'Вывод отменён','done',detail='Отменено пользователем',op_id=row['id'])
+            return None
+        if action=='partner-code':
+            code=str(b.get('code','')).strip().lower()
+            if not re.fullmatch(r'[a-z][a-z0-9_]{3,23}',code) or code.startswith('u') and code[1:].isdigit():
+                raise ValueError('Код: 4–24 латинских символа, цифры или _, первый символ — буква')
+            owner=db.execute('SELECT user_id FROM referral_codes WHERE code=?',(code,)).fetchone()
+            if owner and owner['user_id']!=uid: raise ValueError('Код занят')
+            self.partner(db,uid)
+            db.execute('INSERT OR IGNORE INTO referral_codes VALUES(?,?)',(code,uid))
+            db.execute('UPDATE partners SET code=? WHERE user_id=?',(code,uid))
+            return None
+        if action in ('partner-claim','partner-withdraw'):
+            amount=self.partner(db,uid)['availableCents']
+            if amount<=0: raise ValueError('Нет доступной комиссии')
+            if state.get('debt',0)>0 or self.withdraw_hold(db,uid)>now:
+                raise ValueError('Вывод ограничен до завершения проверки платежей')
+            db.execute('UPDATE partners SET claimed=claimed+? WHERE user_id=?',(amount,uid))
+            if action=='partner-claim':
+                self.credit(state,amount)
+                self.operation(db,uid,'partner','Реферальная комиссия',delta=amount)
+            else:
+                request_id=ident()
+                db.execute('INSERT INTO transfers VALUES(?,?,?,?,?,?)',(request_id,uid,'partner-withdraw','pending',json.dumps(dict(value=amount/100)),now))
+                self.operation(db,uid,'partner-withdraw','Вывод комиссии','pending',detail=request_id,op_id=request_id)
+                db.execute('INSERT INTO outbox(id,message) VALUES(?,?)',(request_id,f'Вывод комиссии #{request_id}: {uid}, {amount/100} BStars'))
+                return dict(requestId=request_id)
+            return None
         if action=='case':
             case=self.cases.get(b.get('caseId'))
             if not case:
                 raise ValueError('Кейс не найден')
             if case.get('free'):
                 previous=db.execute('SELECT claimed FROM claims WHERE user_id=? AND case_id=?',(uid,case['id'])).fetchone()
-                if previous and (case['free']=='subscribe' or now<previous['claimed']+86400):
+                if previous and (case['free']!='daily' or now<previous['claimed']+86400):
                     raise ValueError('Кейс пока недоступен')
                 if case['free']=='subscribe' and not b.get('_subscribed'):
                     raise ValueError('Подпишись на канал для открытия кейса')
+                if case['free']=='referral' and not db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone():
+                    raise ValueError('Кейс доступен после первого входа по реферальной ссылке')
+                if case['free']=='nickname':
+                    profile=json.loads(load_user(db,uid)[0]['profile'])
+                    name=profile.get('first_name','')+' '+profile.get('last_name','')
+                    if not re.search(r'(?<![\w@])@brainrotfreebie(?![\w])',name,re.I):
+                        raise ValueError('Добавь @BrainrotFreebie в имя Telegram и заново открой приложение')
                 db.execute('INSERT INTO claims VALUES(?,?,?) ON CONFLICT(user_id,case_id) DO UPDATE SET claimed=excluded.claimed',(uid,case['id'],now))
             price=cents(case['price'])
             maximum=max(self.items[d['itemId']]['value'] for d in case['drops'])
@@ -298,6 +393,8 @@ class Service:
             state['stats']['opened']+=1
             table=[dict(itemId=d['itemId'],chance=d['chance']) for d in distribution(case,self.items)]
             self.operation(db,uid,'case',f'Кейс · {case["name"]}',delta=-price,detail=f'Получен {self.items[item_id]["name"]}',proof=dict(proof,caseId=case['id'],outcome=item_id,table=table))
+            if not case.get('free'):
+                self.referral_result(db,uid,item_uid,case['price'],self.items[item_id]['value'])
             self.drop(db,uid,item_id)
             return dict(itemId=item_id,uid=item_uid)
         if action=='sale':
@@ -312,7 +409,7 @@ class Service:
             self.limits.check(value,target['value'])
             self.check_risk(db,target['value'])
             rng,proof=self.rng(db,uid,'upgrade')
-            chance=.85*value/target['value']
+            chance=RTP*value/target['value']
             point=landing(chance,rng)
             won_uid=self.add_item(state,target['id']) if point['win'] else None
             state['stats']['upgrades']+=1
@@ -320,6 +417,7 @@ class Service:
                 state['stats']['wins']+=1
                 self.drop(db,uid,target['id'])
             self.operation(db,uid,'upgrade','Апгрейд','win' if point['win'] else 'lose',detail=f'Ставка {value} · цель {target["name"]} · шанс {chance:.8f}',proof=dict(proof,chance=chance,outcome=point))
+            self.referral_result(db,uid,ident(),value,target['value'] if point['win'] else 0)
             return dict(landing=point,wonUid=won_uid)
         elif action=='slots':
             value,_=self.stake(state,[b.get('uid')])
@@ -328,8 +426,9 @@ class Service:
             rng,proof=self.rng(db,uid,'slots')
             result=slots(value,list(self.items),rng)
             self.credit(state,cents(result['payout']))
+            self.referral_result(db,uid,ident(),value,result['payout'])
             state['slotResult']=result
-            self.operation(db,uid,'slots','Слоты','win' if result['multiplier'] else 'lose',cents(result['payout']),f'Ставка {value} · ×{result["multiplier"]}',proof=dict(proof,outcome=result['symbols']))
+            self.operation(db,uid,'slots','Слоты','win' if result['multiplier'] else 'lose',cents(result['payout']),f'Ставка {value} · ×{result["multiplier"]}',proof=dict(proof,rtp=RTP,outcome=result['symbols']))
             return result
         elif action=='mines-start':
             if state['mines'] and state['mines']['status']=='active':
@@ -346,7 +445,7 @@ class Service:
             pool=list(range(25))
             board=[rng.pick(pool) for _ in range(bombs)]
             op=self.operation(db,uid,'mines','Мины','pending',detail=f'Ставка {value} · автозабор после {maximum_steps} безопасных клеток',proof=dict(proof,bombCount=bombs,outcome=board,maxOpened=maximum_steps,riskMax=maximum))
-            state['mines']=dict(id=op,bombCount=bombs,bombs=board,opened=[],stakeValue=value,stakeCount=len(entries),status='active',payout=0,hit=None,expiresAt=(now+60)*1000,maxOpened=maximum_steps,riskMax=maximum)
+            state['mines']=dict(id=op,rtp=RTP,bombCount=bombs,bombs=board,opened=[],stakeValue=value,stakeCount=len(entries),status='active',payout=0,hit=None,expiresAt=(now+60)*1000,maxOpened=maximum_steps,riskMax=maximum)
         elif action in ('mines-reveal','mines-cash'):
             game=state.get('mines')
             if not game or game['status']!='active':
@@ -381,7 +480,7 @@ class Service:
             total=sum(json.loads(r['state'])['rocket']['stakeValue'] for r in db.execute('SELECT state FROM users') if json.loads(r['state']).get('rocket') and json.loads(r['state'])['rocket'].get('roundId')==round_['id'])
             if total+value>round_.get('maxTotalStake',self.limits.rocket_round_stake):
                 raise ValueError('Лимит ставок общего раунда достигнут')
-            proof=dict(serverHash=round_['serverHash'],clientSeed=round_['id'],nonce=0,game='rocket',roundId=round_['id'])
+            proof=dict(serverHash=round_['serverHash'],clientSeed=round_['id'],nonce=0,game='rocket',rtp=round_.get('rtp',.85),roundId=round_['id'])
             op=self.operation(db,uid,'rocket','Ракетка','pending',detail=f'Ставка {value} · раунд {round_["id"]}',proof=proof)
             state['rocket']=dict(id=op,roundId=round_['id'],startAt=round_['startAt'],endAt=round_['endAt'],crash=round_['crash'],capped=round_['capped'],stakeValue=value,stakeCount=len(entries),autoCash=auto,status='active',payout=0,cashAt=0,automatic=False,riskMax=value*100)
         elif action=='rocket-cash':
@@ -422,10 +521,12 @@ class Service:
                 raise ValueError('Не более пяти незавершённых заявок')
             if action=='deposit':
                 item=self.items.get(b.get('itemId'))
-                if not item or item['value']<25:
-                    raise ValueError('Депозит от Ketupat Kepat')
+                if not item or item['value']<self.items['garama']['value'] or item['id']=='eviledon':
+                    raise ValueError('Депозит от Garama, Eviledon не принимается')
                 data=dict(itemId=item['id'],value=item['value'])
             else:
+                if not self.withdrawal_open(now):
+                    raise ValueError('Вывод доступен в субботу с 16:00 до 17:00 МСК')
                 if self.withdraw_hold(db,uid)>now:
                     raise ValueError('Вывод временно ограничен после оплаты Stars. Срок указан в профиле.')
                 value,entries=self.stake(state,b.get('uids'))
@@ -485,6 +586,13 @@ class Service:
                 target_state=state if target==uid else load_user(db,target)[1]
                 data=json.loads(transfer['data'])
                 approve=b['decision']=='approve'
+                if transfer['kind']=='withdraw' and approve and not self.withdrawal_open(now):
+                    raise ValueError('Выдача предметов только в субботу с 16:00 до 17:00 МСК')
+                if transfer['kind']=='partner-withdraw':
+                    if approve and (target_state.get('debt',0)>0 or self.withdraw_hold(db,target)>now):
+                        raise ValueError('Вывод комиссии заблокирован проверкой платежей')
+                    if not approve:
+                        db.execute('UPDATE partners SET claimed=claimed-? WHERE user_id=?',(cents(data['value']),target))
                 if transfer['kind']=='withdraw' and approve and (target_state.get('debt',0)>0 or self.withdraw_hold(db,target)>now):
                     raise ValueError('Вывод заблокирован: возврат Stars или срок удержания')
                 delta=cents(data['value']) if transfer['kind']=='deposit' and approve else 0

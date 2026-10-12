@@ -2,20 +2,20 @@
 import argparse
 import json
 from pathlib import Path
-from .economy import crash_point, landing, roll_case, slots
+from .economy import RTP, crash_point, landing, roll_case, slots
 from .fair import FairRandom, commitment
 
 
-def verify(seed, client, nonce, game, case_id='plant', chance=.5, bomb_count=3):
+def verify(seed, client, nonce, game, case_id='plant', chance=.5, bomb_count=3, rtp=RTP):
     rng=FairRandom(seed,client,nonce)
     catalog=json.loads(Path(__file__).with_name('catalog.json').read_text(encoding='utf-8'))
     items={i['id']:i for i in catalog['items']}
     if game=='rocket':
-        result={'crash':crash_point(rng.draw())}
+        result={'crash':crash_point(rng.draw(),rtp)}
     elif game=='upgrade':
         result=landing(chance,rng)
     elif game=='slots':
-        result=slots(1,list(items),rng)
+        result=slots(1,list(items),rng,rtp)
     elif game=='mines':
         pool=list(range(25))
         result={'bombs':[rng.pick(pool) for _ in range(bomb_count)]}
@@ -43,7 +43,7 @@ def verify_document(proof):
                 outcome=row['itemId']
                 break
     else:
-        result=verify(seed,proof['clientSeed'],proof['nonce'],proof['game'],proof.get('caseId','plant'),proof.get('chance',.5),proof.get('bombCount',3))['result']
+        result=verify(seed,proof['clientSeed'],proof['nonce'],proof['game'],proof.get('caseId','plant'),proof.get('chance',.5),proof.get('bombCount',3),proof.get('rtp',.85))['result']
         outcome=result if proof['game']=='upgrade' else result['symbols'] if proof['game']=='slots' else result['bombs'] if proof['game']=='mines' else result['crash'] if proof['game']=='rocket' else result['itemId']
     expected=proof.get('outcome')
     if proof['game']=='upgrade' and expected:
