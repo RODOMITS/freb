@@ -323,7 +323,7 @@ export const RARITIES = { common: 'Обычный', rare: 'Редкий', epic: 
 export const CASES = [
   {
     "id": "sahur",
-    "name": "Утро Sahur",
+    "name": "Утренний кейс",
     "price": 19,
     "theme": "Sahur",
     "hue": 0,
@@ -357,7 +357,7 @@ export const CASES = [
   },
   {
     "id": "plant",
-    "name": "Банановый сад",
+    "name": "Банановый кейс",
     "price": 49,
     "theme": "Сад и зайцы",
     "hue": 0,
@@ -395,7 +395,7 @@ export const CASES = [
   },
   {
     "id": "night",
-    "name": "Дом с привидениями",
+    "name": "Призрачный кейс",
     "price": 99,
     "theme": "Тёмные брейнроты",
     "hue": 0,
@@ -429,7 +429,7 @@ export const CASES = [
   },
   {
     "id": "fastfood",
-    "name": "Уличная еда",
+    "name": "Сытный кейс",
     "price": 199,
     "theme": "Еда и сладости",
     "hue": 0,
@@ -467,7 +467,7 @@ export const CASES = [
   },
   {
     "id": "feast",
-    "name": "Сладкий стол",
+    "name": "Сладкий кейс",
     "price": 399,
     "theme": "Еда и сладости",
     "hue": 0,
@@ -501,7 +501,7 @@ export const CASES = [
   },
   {
     "id": "cash",
-    "name": "Денежные братья",
+    "name": "Денежный кейс",
     "price": 599,
     "theme": "Братья и комбинации",
     "hue": 0,
@@ -535,7 +535,7 @@ export const CASES = [
   },
   {
     "id": "ocean",
-    "name": "Морские чудовища",
+    "name": "Морской кейс",
     "price": 699,
     "theme": "Морские брейнроты",
     "hue": 0,
@@ -569,7 +569,7 @@ export const CASES = [
   },
   {
     "id": "olympus",
-    "name": "Олимп",
+    "name": "Мифический кейс",
     "price": 499,
     "theme": "Мифы и боссы",
     "hue": 0,
@@ -603,7 +603,7 @@ export const CASES = [
   },
   {
     "id": "dragon",
-    "name": "Драконья кладка",
+    "name": "Драконий кейс",
     "price": 1999,
     "theme": "Мифы и боссы",
     "hue": 0,
@@ -637,7 +637,7 @@ export const CASES = [
   },
   {
     "id": "miami",
-    "name": "Любовный переполох",
+    "name": "Розовый кейс",
     "price": 249,
     "theme": "Сад и зайцы",
     "hue": 0,
@@ -671,7 +671,7 @@ export const CASES = [
   },
   {
     "id": "sunset",
-    "name": "Золотой куш",
+    "name": "Золотой кейс",
     "price": 1299,
     "theme": "Братья и комбинации",
     "hue": 0,
@@ -709,7 +709,7 @@ export const CASES = [
   },
   {
     "id": "burrow",
-    "name": "Зайчья нора",
+    "name": "Пасхальный кейс",
     "price": 399,
     "theme": "Сад и зайцы",
     "hue": 0,
@@ -743,7 +743,7 @@ export const CASES = [
   },
   {
     "id": "combination",
-    "name": "Великие комбинации",
+    "name": "Сборный кейс",
     "price": 799,
     "theme": "Братья и комбинации",
     "hue": 0,
@@ -777,7 +777,7 @@ export const CASES = [
   },
   {
     "id": "heroes",
-    "name": "Щит и пчёлы",
+    "name": "Героический кейс",
     "price": 599,
     "theme": "Герои",
     "hue": 0,
@@ -811,7 +811,7 @@ export const CASES = [
   },
   {
     "id": "bosses",
-    "name": "Тайные боссы",
+    "name": "Тайный кейс",
     "price": 1499,
     "theme": "Мифы и боссы",
     "hue": 0,
