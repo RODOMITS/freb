@@ -101,14 +101,14 @@ class UpdateTests(unittest.TestCase):
             d=distribution(case,self.s.items)
             self.assertAlmostEqual(sum(x['chance'] for x in d),1)
             if not case.get('free'):
-                self.assertAlmostEqual(sum(self.s.items[x['itemId']]['value']*x['chance'] for x in d)/case['price'],.9)
+                self.assertAlmostEqual(sum(self.s.items[x['itemId']]['value']*x['chance'] for x in d)/case['price'],.8)
         class Rng:
             def __init__(self,u):self.u=u
             def draw(self):return self.u
             def pick(self,pool):return pool.pop(0)
-        for u,m in [(0,5),(.029999,5),(.03,2),(.404999,2),(.405,0),(.999,0)]:
+        for u,m in [(0,5),(.029999,5),(.03,2),(.354999,2),(.355,0),(.999,0)]:
             self.assertEqual(slots(10,list(self.s.items),Rng(u))['multiplier'],m)
-        self.assertAlmostEqual(.03*5+.375*2,RTP)
+        self.assertAlmostEqual(.03*5+.325*2,RTP)
 
     def test_top_drop_moscow_day(self):
         with self.s.store.tx() as db:self.s.drop(db,200,'dragon')

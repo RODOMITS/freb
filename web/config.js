@@ -1,6 +1,6 @@
 // All economy, asset paths and case contents live here. BStars are demo coins.
-export const SETTINGS = { rtp: 0.90, startingBalance: 500, topUp: 100, promo: 'MIAMI', promoReward: 100, storageKey: 'brainrot-freebie-v1' };
-export const SLOT_RULES = { pairChance: 0.375, tripleChance: 0.03, pairMultiplier: 2, tripleMultiplier: 5 };
+export const SETTINGS = { rtp: 0.80, startingBalance: 500, topUp: 100, promo: 'MIAMI', promoReward: 100, storageKey: 'brainrot-freebie-v1' };
+export const SLOT_RULES = { pairChance: 0.325, tripleChance: 0.03, pairMultiplier: 2, tripleMultiplier: 5 };
 export const ITEMS = [
   {
     "id": "67",

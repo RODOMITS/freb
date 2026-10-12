@@ -10,7 +10,7 @@ export function distribution(caseConfig) {
   const ev = nominal.reduce((s, d) => s + d.value * d.baseChance, 0);
   const target = caseConfig.price * SETTINGS.rtp;
   const cheapest = nominal.reduce((a, b) => a.value < b.value ? a : b);
-  if (target < cheapest.value || target > ev) throw new Error('Case cannot achieve configured RTP');
+  if (target < cheapest.value || target > ev) throw new Error('Недопустимая конфигурация кейса');
   const scale = (target - cheapest.value) / (ev - cheapest.value);
   return nominal.map(d => ({ ...d, chance: d.baseChance * scale + (d.itemId === cheapest.itemId ? 1 - scale : 0) }));
 }

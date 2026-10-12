@@ -33,7 +33,7 @@ class ApiUpdateTests(unittest.TestCase):
         self.assertEqual(self.api.service.state(100)['partner']['count'],1)
         self.assertEqual(self.client.post('/api/action/partner-claim',json={}).status_code,401)
         self.assertEqual(self.client.get('/api/state').status_code,401)
-        self.assertEqual(self.client.get('/runtime-config').json()['rtp'],.9)
+        self.assertEqual(self.client.get('/runtime-config').json()['rtp'],.8)
 
     def test_start_referral_and_support_mock_telegram(self):
         self.api.service.login(dict(id=100,first_name='Owner'))
@@ -44,7 +44,7 @@ class ApiUpdateTests(unittest.TestCase):
             for _ in range(2):self.assertEqual(self.client.post('/webhook',headers=headers,json=dict(update_id=1,message=message)).status_code,200)
             self.assertEqual(mocked.await_count,1)
             reply=mocked.call_args.args[1]
-            self.assertIn('90% RTP',reply['text'])
+            self.assertIn('Provably True',reply['text'])
             self.assertIn('5298585940577525950',reply['text'])
             self.assertEqual(self.api.service.state(100)['partner']['count'],1)
             message['text']='/support'

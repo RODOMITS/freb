@@ -1,6 +1,6 @@
 import math
 
-RTP = .90
+RTP = .80
 
 
 def distribution(case, items):
@@ -15,7 +15,7 @@ def distribution(case, items):
     minimum = items[cheapest['itemId']]['value']
     target = case['price'] * RTP
     if not minimum <= target <= ev:
-        raise ValueError('Case cannot achieve RTP')
+        raise ValueError('Недопустимая конфигурация кейса')
     scale = (target - minimum) / (ev - minimum) if ev != minimum else 1
     return [dict(d, chance=d['baseChance']*scale + (1-scale if d is cheapest else 0)) for d in drops]
 
