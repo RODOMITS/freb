@@ -93,6 +93,11 @@ class Service:
         available=max(0,earned-account['claimed'])
         return dict(code=account['code'],count=len(people),earned=earned/100,claimed=account['claimed']/100,available=available/100,availableCents=available)
 
+    def maintenance(self):
+        with self.store.tx() as db:
+            row=db.execute("SELECT value FROM controls WHERE name='maintenance'").fetchone()
+            return bool(row and row['value'])
+
     def authenticate(self, token):
         with self.store.tx() as db:
             row = db.execute('SELECT user_id FROM sessions WHERE token=? AND expires>?',(hashlib.sha256(token.encode()).hexdigest(),self.clock())).fetchone()
@@ -237,6 +242,8 @@ class Service:
         result['limits']=self.limits.public()
         control=db.execute("SELECT value FROM controls WHERE name='paused'").fetchone()
         result['gamesPaused']=bool(control and control['value'])
+        maintenance=db.execute("SELECT value FROM controls WHERE name='maintenance'").fetchone()
+        result['maintenance']=bool(maintenance and maintenance['value'])
         result['isAdmin'] = uid in self.admins
         result['profile'] = json.loads(row['profile'])
         history = db.execute('SELECT * FROM operations WHERE user_id=? ORDER BY created DESC,rowid DESC LIMIT ?', (uid,history_limit)).fetchall()
@@ -290,6 +297,9 @@ class Service:
             raise ValueError('Требуется Idempotency-Key')
         fingerprint = hashlib.sha256(json.dumps([action,body],sort_keys=True).encode()).hexdigest()
         with self.store.tx() as db:
+            maintenance=db.execute("SELECT value FROM controls WHERE name='maintenance'").fetchone()
+            if uid not in self.admins and maintenance and maintenance['value']:
+                raise PermissionError('Бот на обновлении. Попробуй позже.')
             cached = db.execute('SELECT * FROM requests WHERE user_id=? AND key=?',(uid,key)).fetchone()
             if cached:
                 if cached['fingerprint'] != fingerprint:
@@ -551,7 +561,15 @@ class Service:
             if uid not in self.admins:
                 raise PermissionError('Доступ администратора запрещён')
             self.audit(db,uid,action,b)
-            if action=='admin-pause':
+            if action=='admin-maintenance':
+                if type(b.get('enabled')) is not bool:
+                    raise ValueError('Некорректный режим обновления')
+                if b['enabled']:
+                    active=any(any((json.loads(r['state']).get(kind) or {}).get('status')=='active' for kind in ('mines','rocket')) for r in db.execute('SELECT state FROM users'))
+                    if active:
+                        raise ValueError('Сначала приостанови новые ставки и дождись окончания активных мин и ракетки, затем закрой приложение.')
+                db.execute("INSERT INTO controls VALUES('maintenance',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",(int(b['enabled']),))
+            elif action=='admin-pause':
                 if type(b.get('paused')) is not bool:
                     raise ValueError('Invalid pause state')
                 db.execute("INSERT INTO controls VALUES('paused',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",(int(b['paused']),))

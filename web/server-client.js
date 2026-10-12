@@ -15,7 +15,7 @@ export async function connectServer() {
     async function request(path,body,key) {
       const response=await fetch(path,{method:body ? 'POST' : 'GET',headers:{'Content-Type':'application/json',...(token ? {Authorization:`Bearer ${token}`} : {}),...(key ? {'Idempotency-Key':key} : {})},...(body ? {body:JSON.stringify(body)} : {}),cache:'no-store'});
       const data=await response.json();
-      if (!response.ok) { if(response.status===401 || response.status===403 && path==='/api/auth') client.locked=true; const error=new Error(typeof data.detail==='string' ? data.detail : 'Запрос отклонён'); error.retryable=response.status>=500; throw error; }
+      if (!response.ok) { if(response.status===401 || response.status===403 && path==='/api/auth') client.locked=true; if(data.detail?.code==='maintenance'){client.locked=true;client.maintenance=true;client.message=data.detail.message;} const error=new Error(typeof data.detail==='string' ? data.detail : data.detail?.message || 'Запрос отклонён'); error.retryable=response.status>=500; throw error; }
       return data;
     }
     token=(await request('/api/auth',{initData:telegram.initData})).token;

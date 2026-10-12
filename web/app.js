@@ -262,7 +262,7 @@ function parseRoute() {
   return ['rocket','mines','admin','slots','upgrade','profile','cases'].includes(hash) || (hash.startsWith('case/') && CASE_BY_ID[hash.slice(5)]) ? hash : 'cases';
 }
 function render({ scroll = false } = {}) {
-  if (server?.locked) { $('#main').innerHTML=`<section class="empty-state"><h1>Brainrot Freebie</h1><p>${esc(server.message)}</p></section>`; $('#balance').textContent='0'; $('.bottom-nav').hidden=true; $('.balance').disabled=true; return; }
+  if (server?.locked) { $('#main').innerHTML=`<section class="empty-state"><h1>${server.maintenance ? 'Бот на обновлении' : 'Brainrot Freebie'}</h1><p>${esc(server.message)}</p>${server.maintenance ? '<p>Снова открой приложение немного позже.</p>' : ''}</section>`; $('#balance').textContent='0'; $('.bottom-nav').hidden=true; $('.balance').disabled=true; return; }
   cancelAnimationFrame(gaugeFrame);
   const route = parseRoute(); activeRoute = route;
   const tab = route.startsWith('case/') ? 'cases' : route==='admin' ? 'profile' : route;
@@ -589,24 +589,29 @@ function enhanceServerProfile() {
   $('.profile-card').insertAdjacentHTML('afterend',`<section class="history-panel"><details><summary>Проверка честности</summary><p class="proof-text">Server hash: ${esc(state.fair.serverHash)}<br>Client seed: ${esc(state.fair.clientSeed)}<br>Nonce: ${state.fair.nonce}</p><form id="fair-form" class="admin-form"><label>Новый client seed<input name="clientSeed" required maxlength="80" value="${esc(state.fair.clientSeed)}"></label><button class="secondary">Раскрыть старый seed и сменить</button></form></details></section><section class="history-panel"><h2>Заявки</h2>${state.transfers.filter(t=>!t.userId || t.userId===state.profile.id).map(t=>`<p class="proof-text">${t.kind==='deposit' ? 'Депозит' : 'Вывод'} · ${esc(t.id)} · ${{pending:'Ожидает',approved:'Подтверждена',rejected:'Отклонена'}[t.status] || esc(t.status)}</p>`).join('') || '<p class="proof-text">Заявок пока нет</p>'}</section>`);
 }
 function enhanceFinancialAdmin() {
-  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel" data-admin-section="money"><div class="selection-title"><h2>Контроль операций</h2></div><p class="proof-text">Бонусы сегодня: ${money(state.bonusSpentToday)} / ${money(state.limits.daily_bonus_budget)} BStars<br>Максимальная выплата: ${money(state.limits.max_payout)} BStars<br>Лимит активного риска: ${money(state.limits.max_open_risk)} BStars</p><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
+  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel" data-admin-section="money"><div class="selection-title"><h2>Контроль операций</h2></div><section style="margin:18px 0;padding:18px;border:1px solid #ffffff20;border-radius:16px"><h3>${state.maintenance ? 'Приложение закрыто на обновление' : 'Приложение открыто'}</h3><p>Во время обновления доступ есть только у администраторов. Перед закрытием приостанови ставки и дождись окончания активных игр.</p><button class="primary" data-action="admin-maintenance">${state.maintenance ? 'Открыть приложение' : 'Закрыть на обновление'}</button></section><p class="proof-text">Бонусы сегодня: ${money(state.bonusSpentToday)} / ${money(state.limits.daily_bonus_budget)} BStars<br>Максимальная выплата: ${money(state.limits.max_payout)} BStars<br>Лимит активного риска: ${money(state.limits.max_open_risk)} BStars</p><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
 }
 async function downloadBackup() {
   try {const blob=await server.download('/api/admin/backup'), url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='freebie-backup.sqlite3';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);} catch(error){toast(error.message);}
 }
 async function pollServer() {
-  if (!server || server.locked) return;
+  if (!server || server.locked && !server.maintenance) return;
+  if(server.maintenance && !server.request)return;
   try {
     if(!busy && !serverRequestPending) {
       const before=state, next=await server.request(`/api/state?limit=${Math.min(Math.max(state.history.length,200),5000)}`);
       if(!busy && !serverRequestPending) {
+        const reopening=server.maintenance;
+        server.maintenance=false;server.locked=false;
+        if(reopening){$('.bottom-nav').hidden=false;$('.balance').disabled=false;}
         adoptServerState(next);
+        if(reopening)render();
         if($('#mine-timer') && state.mines?.status==='active') $('#mine-timer').textContent=`До завершения: ${Math.max(0,Math.ceil((state.mines.expiresAt-server.now())/1000))}с`;
         if(before.rocket?.status==='active' && state.rocket?.status!=='active' && state.rocket?.id===before.rocket.id) rocketResult();
         const financialChanged=JSON.stringify([before.inventory,before.balance,before.gamesPaused,before.debt,before.withdrawHeldUntil,before.refundReviewPending,before.pendingInventory,before.partner,before.withdrawalOpen])!==JSON.stringify([state.inventory,state.balance,state.gamesPaused,state.debt,state.withdrawHeldUntil,state.refundReviewPending,state.pendingInventory,state.partner,state.withdrawalOpen]);
         const flightChanged=JSON.stringify([before.round?.id,before.round?.ended,before.rocket?.status,before.mines])!==JSON.stringify([state.round?.id,state.round?.ended,state.rocket?.status,state.mines]);
         const changed=financialChanged || activeRoute==='cases' && JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
-        const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday]);
+        const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday,before.maintenance])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday,state.maintenance]);
         if((changed || adminChanged) && !$('#modal').open) {
           const values=[...document.querySelectorAll('#main input')].filter(i=>i.name && i.form?.id).map(i=>({form:i.form.id,name:i.name,value:i.value}));
           const focused=document.activeElement, focus=focused?.form?.id && focused.name ? {form:focused.form.id,name:focused.name} : null;
@@ -689,6 +694,7 @@ document.addEventListener('click', event => {
     case 'quick': quickTarget(id); break;
     case 'sell': sellDialog(id); break;
     case 'confirm-sell': sell(id); break;
+    case 'admin-maintenance': void serverAction('admin-maintenance',{enabled:!state.maintenance}).then(r=>{if(r)render();});break;
     case 'admin-tab': document.querySelectorAll('[data-admin-section]').forEach(s=>s.hidden=id!=='all' && s.dataset.adminSection!==id);document.querySelectorAll('[data-action=admin-tab]').forEach(b=>b.classList.toggle('active',b.dataset.id===id));break;
     case 'admin-user': $('#admin-balance-form').elements.namedItem('userId').value=id;toast('Пользователь выбран');break;
     case 'locked-item': break;

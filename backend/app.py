@@ -171,7 +171,10 @@ def user_id(authorization):
     if not authorization or not authorization.startswith('Bearer '):
         raise HTTPException(401,'Открой приложение в Telegram')
     try:
-        return service.authenticate(authorization[7:])
+        uid=service.authenticate(authorization[7:])
+        if uid not in service.admins and service.maintenance():
+            raise HTTPException(503,dict(code='maintenance',message='Бот на обновлении. Скоро вернёмся.'))
+        return uid
     except PermissionError as error:
         raise HTTPException(401,str(error))
 
@@ -248,6 +251,8 @@ async def auth(request: Request):
     rate_limit(('auth',request.client.host),30,60)
     body=await object_body(request)
     user=validate_init_data(str(body.get('initData','')),BOT_TOKEN)
+    if user['id'] not in service.admins and service.maintenance():
+        raise HTTPException(503,dict(code='maintenance',message='Бот на обновлении. Скоро вернёмся.'))
     return dict(token=service.login(user,dict(parse_qsl(str(body.get('initData','')))).get('start_param','')))
 
 
@@ -344,7 +349,7 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
     if query:
         with service.store.tx() as db:
             row=db.execute('SELECT * FROM invoices WHERE id=?',(query.get('invoice_payload'),)).fetchone()
-            ok=bool(PAYMENTS and row and (row['status']=='pending' or row['status']=='processing' and row['checkout']==query.get('id')) and row['user_id']==query.get('from',{}).get('id') and query.get('currency')=='XTR' and row['stars']==query.get('total_amount'))
+            ok=bool(PAYMENTS and (query.get('from',{}).get('id') in service.admins or not (db.execute("SELECT value FROM controls WHERE name='maintenance'").fetchone() or {'value':0})['value']) and row and (row['status']=='pending' or row['status']=='processing' and row['checkout']==query.get('id')) and row['user_id']==query.get('from',{}).get('id') and query.get('currency')=='XTR' and row['stars']==query.get('total_amount'))
             if ok and row['status']=='pending':
                 db.execute('UPDATE invoices SET status=?,checkout=? WHERE id=?',('processing',query['id'],row['id']))
         await telegram('answerPreCheckoutQuery',dict(pre_checkout_query_id=query['id'],ok=ok,**({} if ok else dict(error_message='Счёт недоступен. Создай новый.'))))
@@ -381,6 +386,12 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
         db.execute('INSERT INTO updates VALUES(?,?)',(update_id,time.time()))
     text=message.get('text','').split()[0] if message.get('text') else ''
     chat=message.get('chat',{}).get('id')
+    if chat and message.get('chat',{}).get('type')=='private' and message.get('from',{}).get('id') not in service.admins and service.maintenance() and not payment:
+        try:
+            await telegram('sendMessage',dict(chat_id=chat,text='Бот на обновлении. Скоро вернёмся.'))
+        except HTTPException:
+            log.warning('Maintenance notice delivery failed')
+        return dict(ok=True)
     if text in ('/start','/support','/paysupport','/terms') and chat:
         if text=='/start':
             parts=message.get('text','').split(maxsplit=1)
