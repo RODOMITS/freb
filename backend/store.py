@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS referral_codes(code TEXT PRIMARY KEY, user_id INTEGER
 CREATE TABLE IF NOT EXISTS referrals(invitee INTEGER PRIMARY KEY, inviter INTEGER NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS referral_ledger(event_id TEXT PRIMARY KEY, invitee INTEGER NOT NULL, net INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS quest_claims(user_id INTEGER NOT NULL, day TEXT NOT NULL, quest_id TEXT NOT NULL, claimed REAL NOT NULL, PRIMARY KEY(user_id,day,quest_id));
+CREATE TABLE IF NOT EXISTS bot_dialogs(actor INTEGER PRIMARY KEY, request_id TEXT NOT NULL, last_sent REAL NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS operations_user ON operations(user_id,created DESC);
 '''
 
@@ -50,7 +51,11 @@ class Store:
                     db.execute(f'ALTER TABLE referral_ledger ADD COLUMN {name} {kind}')
             if 'completed' not in {r['name'] for r in db.execute('PRAGMA table_info(operations)')}:
                 db.execute('ALTER TABLE operations ADD COLUMN completed REAL')
-            db.execute('PRAGMA user_version=6')
+            outbox_columns={r['name'] for r in db.execute('PRAGMA table_info(outbox)')}
+            for name,kind in [('method','TEXT'),('payload','TEXT'),('retry_at','REAL NOT NULL DEFAULT 0')]:
+                if name not in outbox_columns:
+                    db.execute(f'ALTER TABLE outbox ADD COLUMN {name} {kind}')
+            db.execute('PRAGMA user_version=7')
 
     def backup(self, directory):
         from datetime import datetime, timezone

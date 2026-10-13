@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import validate_init_data
+from .deposit_chat import handle as handle_deposit_chat
 from .service import Service, ident, integer
 from .store import load_user, save_user
 from .risk import Limits
@@ -65,16 +66,16 @@ async def notify_outbox():
     while True:
         if BOT_TOKEN:
             with service.store.tx() as db:
-                message=db.execute('SELECT * FROM outbox WHERE sent=0 AND attempts<10 ORDER BY rowid LIMIT 1').fetchone()
+                message=db.execute('SELECT * FROM outbox WHERE sent=0 AND attempts<10 AND retry_at<=? ORDER BY rowid LIMIT 1',(time.time(),)).fetchone()
             if message:
                 try:
-                    await telegram('sendMessage',dict(chat_id=OWNER_ID,text=message['message']))
+                    await telegram(message['method'] or 'sendMessage',json.loads(message['payload']) if message['payload'] else dict(chat_id=OWNER_ID,text=message['message']))
                     with service.store.tx() as db:
                         db.execute('UPDATE outbox SET sent=1 WHERE id=?',(message['id'],))
                 except HTTPException:
                     with service.store.tx() as db:
-                        db.execute('UPDATE outbox SET attempts=attempts+1 WHERE id=?',(message['id'],))
-        await asyncio.sleep(5)
+                        db.execute('UPDATE outbox SET attempts=attempts+1,retry_at=? WHERE id=?',(time.time()+30,message['id']))
+        await asyncio.sleep(1)
 
 
 def tick():
@@ -100,7 +101,7 @@ async def configure_telegram():
     while True:
         try:
             BOT_USERNAME=(await telegram('getMe',{}))['username']
-            await telegram('setWebhook',dict(url=PUBLIC_URL+'/webhook',secret_token=WEBHOOK_SECRET,allowed_updates=['message','pre_checkout_query'],drop_pending_updates=False))
+            await telegram('setWebhook',dict(url=PUBLIC_URL+'/webhook',secret_token=WEBHOOK_SECRET,allowed_updates=['message','pre_checkout_query','callback_query'],drop_pending_updates=False))
             await telegram('setChatMenuButton',dict(menu_button=dict(type='web_app',text='Открыть Freebie',web_app=dict(url=PUBLIC_URL))))
             log.info('Telegram webhook and menu configured')
             return
@@ -356,6 +357,14 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
             if ok and row['status']=='pending':
                 db.execute('UPDATE invoices SET status=?,checkout=? WHERE id=?',('processing',query['id'],row['id']))
         await telegram('answerPreCheckoutQuery',dict(pre_checkout_query_id=query['id'],ok=ok,**({} if ok else dict(error_message='Счёт недоступен. Создай новый.'))))
+        return dict(ok=True)
+    relay=handle_deposit_chat(service,update,OWNER_ID)
+    if relay is not None:
+        if update.get('callback_query'):
+            try:
+                await telegram('answerCallbackQuery',dict(callback_query_id=update['callback_query']['id'],text=relay.get('answer') or ''))
+            except HTTPException:
+                pass
         return dict(ok=True)
     message=update.get('message',{})
     payment=message.get('successful_payment')
