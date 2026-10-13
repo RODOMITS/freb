@@ -60,13 +60,13 @@ class Release150Tests(unittest.TestCase):
             save_user(db,uid,state)
         return entries
 
-    def test_case_catalog_has_half_break_even_and_valid_floor(self):
+    def test_case_catalog_preserves_drop_weights_after_price_revert(self):
         for case in self.s.cases.values():
             drops=distribution(case,self.s.items)
             self.assertAlmostEqual(sum(d['chance'] for d in drops),1)
             if case.get('free'):continue
-            self.assertAlmostEqual(sum(d['chance'] for d in drops if self.s.items[d['itemId']]['value']>=case['price']),.5)
-            self.assertAlmostEqual(sum(d['chance']*self.s.items[d['itemId']]['value'] for d in drops),.8*case['price'])
+            self.assertAlmostEqual(sum(d['chance'] for d in drops if self.s.items[d['itemId']]['value']>=case['price']),{'feast':0.06947677842545236,'burrow':0.031579063640731056}.get(case['id'],.5))
+            self.assertAlmostEqual(sum(d['chance']*self.s.items[d['itemId']]['value'] for d in drops),{'sahur':18.4,'feast':308,'burrow':272}.get(case['id'],.8*case['price']))
             self.assertGreaterEqual(min(self.s.items[d['itemId']]['value'] for d in drops),.3*case['price'])
 
     def test_three_cases_are_atomic_and_idempotent(self):

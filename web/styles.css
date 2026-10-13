@@ -228,3 +228,5 @@ dialog:has(.wallet-modal){width:560px}.wallet-deposit-form{margin:18px 0}.wallet
 .rocket-balance-stake small{display:block;color:var(--muted);font-size:10px;margin-top:9px}
 .item-grid{overflow-anchor:none}
 @media(max-width:620px){.open-controls{gap:8px}.case-counts{gap:8px;flex:1}.case-counts>button{flex:1;min-width:0;padding:0 10px;gap:7px;font-size:10px}.case-counts>button>strong{font-size:16px}.case-results{gap:7px}.case-result{padding:10px 6px}.case-result img{height:95px}.case-result strong{font-size:10px}.rocket-balance-stake label>span{max-width:45%;text-align:right}}
+
+.upgrade-confetti{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:1000}.upgrade-confetti i{position:absolute;display:block;pointer-events:none;will-change:transform,opacity}

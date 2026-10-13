@@ -133,7 +133,7 @@ const freeLabel=c=>({daily:'Раз в 24 часа',subscribe:'За подпис�
 function renderCases() {
   const groups=Object.fromEntries(['Бесплатные','Дешёвые','Средние','Мощные'].map(name=>[name,CASES.filter(c=>(c.free ? 'Бесплатные' : c.price<=199 ? 'Дешёвые' : c.price<=699 ? 'Средние' : 'Мощные')===name)]).filter(([,cases])=>cases.length));
   const top=state.topDrop, topItem=top && ITEM_BY_ID[top.itemId];
-  return `${feedMarkup()}${topItem ? `<section class="top-drop"><img src="${topItem.image}" alt=""><div><small>ТОП ДРОП ДНЯ · МСК</small><h2>${esc(topItem.name)}</h2><span>${esc(top.playerName)} · ✦ ${money(topItem.value)}</span></div></section>` : ''}<div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div><nav class="theme-tabs">${Object.keys(groups).map((name,i)=>`<a href="#theme-${i}" data-theme="theme-${i}">${esc(name)}</a>`).join('')}</nav>${Object.entries(groups).map(([name,cases],i)=>`<section id="theme-${i}" class="case-theme"><h2>${esc(name)}</h2><div class="case-grid">${cases.map(c=>`<a href="#case/${c.id}" class="case-card" style="--hue:${c.hue}deg"><h3>${esc(c.name)}</h3><img class="case-art" src="${c.image}" onerror="this.onerror=null;this.src='img/cases/plant.png'" alt="Кейс ${esc(c.name)}"><span class="case-price">${c.free ? freeLabel(c) : `✦ ${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`).join('')}`;
+  return `${feedMarkup()}${topItem ? `<section class="top-drop"><img src="${topItem.image}" alt=""><div><small>ТОП ДРОП ДНЯ · МСК</small><h2>${esc(topItem.name)}</h2><span>${esc(top.playerName)} · ✦ ${money(topItem.value)}</span></div></section>` : ''}<div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div>${Object.entries(groups).map(([name,cases],i)=>`<section id="theme-${i}" class="case-theme"><h2>${esc(name)}</h2><div class="case-grid">${cases.map(c=>`<a href="#case/${c.id}" class="case-card" style="--hue:${c.hue}deg"><h3>${esc(c.name)}</h3><img class="case-art" src="${c.image}" onerror="this.onerror=null;this.src='img/cases/plant.png'" alt="Кейс ${esc(c.name)}"><span class="case-price">${c.free ? freeLabel(c) : `✦ ${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`).join('')}`;
 }
 function shuffledBrainrots(caseConfig) {
   const items = caseConfig.drops.map(drop => ITEM_BY_ID[drop.itemId]);
@@ -255,7 +255,7 @@ function sellAllDialog() {
   const value=state.inventory.reduce((sum,e)=>sum+ITEM_BY_ID[e.itemId].value,0);
   openModal(`<div class="modal-content wallet-modal"><h2>Продать всё?</h2><p>Доступных предметов: ${state.inventory.length}. На выводе остаются заблокированы.</p><div class="result-value">✦ ${money(value)} BStars</div><div class="modal-actions"><button class="primary" data-action="confirm-sell-all" data-id="${state.inventoryHash || ''}">Продать</button><button class="secondary" data-action="close-modal">Отмена</button></div></div>`);
 }
-document.addEventListener('click',event=>{const a=event.target.closest('[data-theme]');if(a){event.preventDefault();document.getElementById(a.dataset.theme)?.scrollIntoView({behavior:'smooth',block:'start'});}});
+
 
 function slotSymbol(itemId) {
   const item = ITEM_BY_ID[itemId];
@@ -402,6 +402,23 @@ function quickTarget(p) {
   targetId = valid.reduce((a,b) => Math.abs(upgradeChance(source,a)-desired) <= Math.abs(upgradeChance(source,b)-desired) ? a : b).id;
   quick = Number(p); targetSearch = ''; render(); haptic();
 }
+function celebrateUpgrade() {
+  if(reducedMotion.matches)return;
+  try {
+    document.querySelectorAll('.upgrade-confetti').forEach(layer=>layer.remove());
+    const layer=document.createElement('div');layer.className='upgrade-confetti';layer.setAttribute('aria-hidden','true');
+    const modal=$('#modal');(modal?.open ? modal : document.body).appendChild(layer);
+    const width=window.innerWidth,height=window.innerHeight,colors=['#ff83c2','#7ee8dc','#ffcf76','#b48aff','#ffffff'];
+    for(let n=0;n<64;n++) {
+      const particle=document.createElement('i'),drift=(Math.random()-.5)*260;
+      particle.style.cssText=`left:${Math.random()*width}px;top:-24px;background:${colors[n%colors.length]};width:${5+Math.random()*5}px;height:${8+Math.random()*7}px;border-radius:${n%3===0 ? '50%' : '2px'}`;
+      layer.appendChild(particle);
+      const animation=particle.animate([{transform:'translate3d(0,0,0) rotate(0deg)',opacity:1},{transform:`translate3d(${drift}px,${height+50}px,0) rotate(${360+Math.random()*720}deg)`,opacity:0}],{duration:1500+Math.random()*1000,delay:Math.random()*160,easing:'cubic-bezier(.12,.65,.55,1)',fill:'forwards'});
+      animation.finished.catch(()=>{}).finally(()=>particle.remove());
+    }
+    setTimeout(()=>layer.remove(),2800);
+  } catch {document.querySelectorAll('.upgrade-confetti').forEach(layer=>layer.remove());}
+}
 async function upgrade() {
   if (busy) return;
   const fast = fastMode || reducedMotion.matches;
@@ -438,6 +455,7 @@ async function upgrade() {
   await new Promise(resolve=>setTimeout(resolve,fast ? 400 : 900));
   setBusy(false); sourceUids.clear(); targetId = null; quick = null; render();
   openModal(`<div class="modal-content ${win ? target.rarity : source.rarity}"><h2>${win ? 'Апгрейд выполнен' : 'Апгрейд не удался'}</h2>${win ? `<div class="result-art"><img src="${target.image}" alt="${esc(target.name)}"></div><div class="result-name">${esc(target.name)}</div><div class="result-value">✦ ${money(target.value)}</div>` : '<div class="modal-status-icon" style="color:#e38fa9">↺</div>'}<p style="margin-top:14px">${win ? 'Предмет добавлен в инвентарь.' : `Потрачено предметов: ${stake.entries.length} · ✦ ${money(stake.value)}`}<br>Шанс: ${percent(chance)}.</p><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button>${win ? `<button class="secondary" data-action="to-upgrade" data-id="${wonUid}">Ещё апгрейд</button>` : '<button class="secondary" data-action="goto-cases">К кейсам</button>'}</div></div>`);
+  if(win)celebrateUpgrade();
 }
 async function spinSlots() {
   if (busy) return;

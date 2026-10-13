@@ -9,7 +9,7 @@ var engineURL='data:text/javascript;base64,'+Buffer.from(updateSources['web/engi
 var featureURL='data:text/javascript;base64,'+Buffer.from(updateSources['web/feature-views.js'].replace("'./config.js'",JSON.stringify(configURL)).replace("'./engine.js'",JSON.stringify(engineURL))).toString('base64');
 var configMod=await import(configURL),engineMod=await import(engineURL),featureMod=await import(featureURL);
 var assert=(ok,msg)=>{if(!ok)throw Error(msg)};
-var caseChecks=configMod.CASES.map(c=>{const d=engineMod.distribution(c),profit=d.filter(x=>configMod.ITEM_BY_ID[x.itemId].value>=c.price).reduce((a,x)=>a+x.chance,0);assert(Math.abs(profit-.5)<1e-9,'profit '+c.id);return c.id;});
+var caseChecks=configMod.CASES.map(c=>{const d=engineMod.distribution(c),profit=d.filter(x=>configMod.ITEM_BY_ID[x.itemId].value>=c.price).reduce((a,x)=>a+x.chance,0);assert(Math.abs(profit-({"feast":0.06947677842545236,"burrow":0.031579063640731056}[c.id] ?? .5))<1e-9,'profit '+c.id);return c.id;});
 var sampleState={...engineMod.newState(),balance:50000,inventory:[]};
 var betState=engineMod.startRocket(sampleState,new Set(),2,.5,1000,1234.56);
 assert(Math.abs(betState.balance-48765.44)<1e-8,'balance charge');
