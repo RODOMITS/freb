@@ -41,7 +41,9 @@ class Store:
                 db.execute('ALTER TABLE invoices ADD COLUMN held_until REAL NOT NULL DEFAULT 0')
                 # Existing paid balances receive the announced conservative withdrawal hold.
                 db.execute("UPDATE invoices SET held_until=created+504*3600 WHERE status='paid'")
-            db.execute('PRAGMA user_version=3')
+            if 'bonus' not in {r['name'] for r in db.execute('PRAGMA table_info(invoices)')}:
+                db.execute('ALTER TABLE invoices ADD COLUMN bonus INTEGER NOT NULL DEFAULT 0')
+            db.execute('PRAGMA user_version=4')
 
     def backup(self, directory):
         from datetime import datetime, timezone

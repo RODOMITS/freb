@@ -334,8 +334,11 @@ async def invoice(request: Request,authorization: str=Header(default=''),idempot
         prior=db.execute('SELECT * FROM invoices WHERE id=?',(invoice_id,)).fetchone()
         if prior and (prior['stars']!=amount or prior['status']!='pending'):
             raise ValueError('Счёт уже использован')
-        db.execute('INSERT OR IGNORE INTO invoices(id,user_id,stars,status,charge,created) VALUES(?,?,?,?,?,?)',(invoice_id,uid,amount,'pending',None,time.time()))
-    link=await telegram('createInvoiceLink',dict(title='BStars',description=f'{amount} Stars → {amount*1.5:g} BStars',payload=invoice_id,provider_token='',currency='XTR',prices=[dict(label='BStars',amount=amount)]))
+        if not prior:
+            service.bind_referral(db,uid,body.get('referralCode'))
+        bonus=prior['bonus'] if prior else service.topup_bonus(db,uid,amount*150)
+        db.execute('INSERT OR IGNORE INTO invoices(id,user_id,stars,status,charge,created,bonus) VALUES(?,?,?,?,?,?,?)',(invoice_id,uid,amount,'pending',None,time.time(),bonus))
+    link=await telegram('createInvoiceLink',dict(title='BStars',description=f'{amount} Stars → {(amount*150+bonus)/100:g} BStars',payload=invoice_id,provider_token='',currency='XTR',prices=[dict(label='BStars',amount=amount)]))
     return dict(url=link)
 
 
@@ -371,10 +374,10 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
                 if db.execute('SELECT 1 FROM invoices WHERE charge=?',(charge,)).fetchone():
                     raise HTTPException(400,'Payment charge already used')
                 _,account=load_user(db,uid)
-                delta=row['stars']*150
+                delta=row['stars']*150+row['bonus']
                 service.credit(account,delta)
                 save_user(db,uid,account)
-                service.operation(db,uid,'topup','Пополнение звёздами',delta=delta,detail=f'{row["stars"]} Stars · 1 Star = 1,5 BStars')
+                service.operation(db,uid,'topup','Пополнение звёздами',delta=delta,detail=f'{row["stars"]} Stars · бонус +{row["bonus"]/100:g} BStars')
                 db.execute('UPDATE invoices SET status=?,charge=?,held_until=? WHERE id=?',('paid',charge,time.time()+service.limits.stars_hold_hours*3600,row['id']))
         refunded=message.get('refunded_payment')
         if refunded:

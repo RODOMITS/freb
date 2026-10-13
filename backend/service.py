@@ -52,7 +52,7 @@ class Service:
             code='u'+str(uid)
             db.execute('INSERT OR IGNORE INTO partners(user_id,code) VALUES(?,?)',(uid,code))
             db.execute('INSERT OR IGNORE INTO referral_codes VALUES(?,?)',(code,uid))
-            if fresh and start_param.startswith('ref_'):
+            if start_param.startswith('ref_'):
                 parent=db.execute('SELECT user_id FROM referral_codes WHERE code=?',(start_param[4:].lower(),)).fetchone()
                 if parent and parent['user_id']!=uid:
                     db.execute('INSERT OR IGNORE INTO referrals VALUES(?,?,?)',(uid,parent['user_id'],now))
@@ -92,6 +92,20 @@ class Service:
         earned=max(0,net)*40//100
         available=max(0,earned-account['claimed'])
         return dict(code=account['code'],count=len(people),earned=earned/100,claimed=account['claimed']/100,available=available/100,availableCents=available)
+
+    def bind_referral(self, db, uid, code):
+        code=str(code or '').strip().lower()
+        if not code: return
+        parent=db.execute('SELECT user_id FROM referral_codes WHERE code=?',(code,)).fetchone()
+        if not parent: raise ValueError('Реферальный код не найден')
+        if parent['user_id']==uid: raise ValueError('Нельзя указать свой код')
+        existing=db.execute('SELECT inviter FROM referrals WHERE invitee=?',(uid,)).fetchone()
+        if existing and existing['inviter']!=parent['user_id']:
+            raise ValueError('Ты уже закреплён за другим человеком')
+        db.execute('INSERT OR IGNORE INTO referrals VALUES(?,?,?)',(uid,parent['user_id'],self.clock()))
+
+    def topup_bonus(self, db, uid, amount):
+        return (amount*15+50)//100 if db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone() else 0
 
     def maintenance(self):
         with self.store.tx() as db:
@@ -154,7 +168,7 @@ class Service:
             return
         uid=invoice['user_id']
         _,state=load_user(db,uid)
-        delta=invoice['stars']*150 if invoice['status'] in ('paid','refund_requested') else 0
+        delta=invoice['stars']*150+invoice['bonus'] if invoice['status'] in ('paid','refund_requested') else 0
         used=min(delta,state['balance'])
         state['balance']-=used
         state['debt']=state.get('debt',0)+delta-used
@@ -230,6 +244,8 @@ class Service:
         result = copy.deepcopy(state)
         result['balance'] /= 100
         result['partner']=self.partner(db,uid)
+        parent=db.execute('SELECT p.code FROM referrals r JOIN partners p ON p.user_id=r.inviter WHERE r.invitee=?',(uid,)).fetchone()
+        result['referrerCode']=parent['code'] if parent else None
         result['partner'].pop('availableCents',None)
         result['withdrawalOpen']=self.withdrawal_open(self.clock())
         result['pendingInventory']=[dict(e,requestId=r['id'],status='withdrawing') for r in db.execute("SELECT id,data FROM transfers WHERE user_id=? AND kind='withdraw' AND status='pending'",(uid,)) for e in json.loads(r['data'])['entries']]
@@ -329,6 +345,10 @@ class Service:
             control=db.execute("SELECT value FROM controls WHERE name='paused'").fetchone()
             if control and control['value']:
                 raise ValueError('Приём новых ставок временно приостановлен. Активные игры продолжаются.')
+        if action=='referral-bind':
+            if not str(b.get('code','')).strip(): raise ValueError('Введи реферальный код')
+            self.bind_referral(db,uid,b.get('code'))
+            return None
         if action=='withdraw-cancel':
             row=db.execute("SELECT * FROM transfers WHERE id=? AND user_id=? AND kind IN ('withdraw','partner-withdraw') AND status='pending'",(str(b.get('requestId')),uid)).fetchone()
             if not row:
@@ -389,18 +409,10 @@ class Service:
             maximum=max(self.items[d['itemId']]['value'] for d in case['drops'])
             self.limits.check_case(case['price'],maximum)
             self.check_risk(db,maximum)
-            if case.get('free'):
-                day=datetime.fromtimestamp(now,timezone.utc).strftime('%Y-%m-%d')
-                db.execute('INSERT OR IGNORE INTO bonus_spend VALUES(?,0)',(day,))
-                spent=db.execute('SELECT spent FROM bonus_spend WHERE day=?',(day,)).fetchone()['spent']
-                if spent+cents(maximum)>cents(self.limits.daily_bonus_budget):
-                    raise ValueError('Бюджет бесплатных наград на сегодня исчерпан')
             if state['balance'] < price:
                 raise ValueError('Не хватает BStars')
             rng,proof=self.rng(db,uid,'case')
             item_id=roll_case(case,self.items,rng)
-            if case.get('free'):
-                db.execute('UPDATE bonus_spend SET spent=spent+? WHERE day=?',(cents(self.items[item_id]['value']),day))
             state['balance']-=price
             item_uid=self.add_item(state,item_id)
             state['stats']['opened']+=1
@@ -511,12 +523,6 @@ class Service:
                 raise ValueError('Ты уже активировал этот промокод')
             db.execute('INSERT INTO redemptions VALUES(?,?)',(uid,code))
             db.execute('UPDATE promos SET uses=uses+1 WHERE code=?',(code,))
-            day=datetime.fromtimestamp(now,timezone.utc).strftime('%Y-%m-%d')
-            db.execute('INSERT OR IGNORE INTO bonus_spend VALUES(?,0)',(day,))
-            spent=db.execute('SELECT spent FROM bonus_spend WHERE day=?',(day,)).fetchone()['spent']
-            if spent+promo['reward']>cents(self.limits.daily_bonus_budget):
-                raise ValueError('Бюджет бонусов на сегодня исчерпан')
-            db.execute('UPDATE bonus_spend SET spent=spent+? WHERE day=?',(promo['reward'],day))
             self.credit(state,promo['reward'])
             self.operation(db,uid,'promo','Промокод активирован',delta=promo['reward'],detail=code)
         elif action=='fair-rotate':
@@ -536,7 +542,8 @@ class Service:
                 item=self.items.get(b.get('itemId'))
                 if not item or item['value']<self.items['garama']['value'] or item['id']=='eviledon':
                     raise ValueError('Депозит от Garama, Eviledon не принимается')
-                data=dict(itemId=item['id'],value=item['value'])
+                self.bind_referral(db,uid,b.get('referralCode'))
+                data=dict(itemId=item['id'],value=item['value'],bonus=self.topup_bonus(db,uid,cents(item['value'])))
             else:
                 if not self.withdrawal_open(now):
                     raise ValueError('Вывод доступен в субботу с 16:00 до 17:00 МСК')
@@ -616,7 +623,7 @@ class Service:
                         db.execute('UPDATE partners SET claimed=claimed-? WHERE user_id=?',(cents(data['value']),target))
                 if transfer['kind']=='withdraw' and approve and (target_state.get('debt',0)>0 or self.withdraw_hold(db,target)>now):
                     raise ValueError('Вывод заблокирован: возврат Stars или срок удержания')
-                delta=cents(data['value']) if transfer['kind']=='deposit' and approve else 0
+                delta=cents(data['value'])+data.get('bonus',0) if transfer['kind']=='deposit' and approve else 0
                 self.credit(target_state,delta)
                 if transfer['kind']=='withdraw' and not approve:
                     target_state['inventory'].extend(data['entries'])
