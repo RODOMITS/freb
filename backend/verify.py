@@ -2,7 +2,7 @@
 import argparse
 import json
 from pathlib import Path
-from .economy import RTP, crash_point, landing, roll_case, slots
+from .economy import RTP, crash_point, landing, legacy_landing, roll_case, slots
 from .fair import FairRandom, commitment
 
 
@@ -42,6 +42,9 @@ def verify_document(proof):
             if unit<cumulative:
                 outcome=row['itemId']
                 break
+    elif proof['game']=='upgrade':
+        draw=FairRandom(seed,proof['clientSeed'],proof['nonce'])
+        outcome=(landing if proof.get('geometry')=='arrow' else legacy_landing)(proof.get('chance',.5),draw)
     elif proof['game']=='slots':
         pool=proof.get('itemIds',['67', 'lagrand', 'bananito', 'esok', 'ketupat', 'tictac', 'lavadorito', 'garama', 'eviledon', 'cash', 'pizza', 'burguro', 'capitano', 'cerberus', 'pegasus', 'guest666', 'cookie', 'fortunu', 'ketupatbro', 'foxini', 'venuspino', 'dragon'])
         outcome=slots(1,list(pool),FairRandom(seed,proof['clientSeed'],proof['nonce']),proof.get('rtp',.85))['symbols']

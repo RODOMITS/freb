@@ -27,18 +27,21 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(sum(v==max(prices) for v in prices),1)
             actual=distribution(case,items)
             self.assertAlmostEqual(sum(d['chance'] for d in actual),1)
+            self.assertAlmostEqual(sum(d['chance'] for d in actual if items[d['itemId']]['value']>=case['price']),.5)
+            self.assertGreaterEqual(min(prices)/case['price'],.3)
             self.assertAlmostEqual(sum(items[d['itemId']]['value']*d['chance'] for d in actual)/case['price'],.80)
             used.update(d['itemId'] for d in actual)
         self.assertTrue((set(items)-set(LEGACY))<=used)
 
-    def test_expensive_cases_with_original_inventory_limits(self):
+    def test_expensive_cases_without_game_caps(self):
         with tempfile.TemporaryDirectory(dir=ROOT/'data') as tmp:
             s=Service(Path(tmp)/'db.sqlite',starting_balance=10000)
             s.login(dict(id=1,first_name='Test'))
             result=s.mutate(1,'case',dict(caseId='dragon'),ident())
             self.assertEqual(result['state']['balance'],8001)
-            self.assertEqual(s.limits.max_stake,1000)
-            with self.assertRaises(ValueError):s.limits.check(1999,7387)
+            s.limits.check(1999,7387)
+            s.limits.check(50000,5000000)
+            self.assertEqual(s.limits.mines_steps(7387,3),22)
 
     def test_historical_slot_catalog_is_stable(self):
         seed='old-seed';client='player'

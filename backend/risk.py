@@ -28,27 +28,16 @@ class Limits:
             if type(value) is not int or not 0<=value<=100000000:
                 raise ValueError(f'Invalid limit: {key}')
         result=cls(**values)
-        if not result.max_stake or not result.max_payout or result.max_open_risk<result.max_payout:
-            raise ValueError('Invalid payout/risk limits')
         return result
 
     def public(self):
-        return asdict(self)
+        return {key:value for key,value in asdict(self).items() if key in ('withdraw_request_max','withdraw_user_daily','stars_hold_hours')}
 
     def check(self, stake, payout):
-        if stake>self.max_stake:
-            raise ValueError(f'Максимальная ставка: {self.max_stake} BStars')
-        if payout>self.max_payout:
-            raise ValueError(f'Максимальная выплата: {self.max_payout} BStars. Уменьши ставку.')
+        return None
 
     def check_case(self, price, payout):
-        if price>self.max_case_price:
-            raise ValueError(f'Максимальная цена кейса: {self.max_case_price} BStars')
-        if payout>self.max_payout:
-            raise ValueError('Кейс превышает лимит выплаты')
+        return None
 
     def mines_steps(self, stake, bombs):
-        steps=[k for k in range(1,26-bombs) if cents(stake*mines_multiplier(bombs,k))<=cents(self.max_payout)]
-        if not steps:
-            raise ValueError('Ставка превышает лимит выплаты мин')
-        return steps[-1]
+        return 25-bombs

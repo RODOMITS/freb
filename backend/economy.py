@@ -6,18 +6,9 @@ RTP = .80
 def distribution(case, items):
     drops = case['drops']
     total = sum(d['baseChance'] for d in drops)
-    if abs(total - 1) > 1e-9:
+    if abs(total - 1) > 1e-9 or any(d['baseChance'] < 0 for d in drops):
         raise ValueError('Case weights must total 1')
-    if case.get('free'):
-        return [dict(d, chance=d['baseChance']) for d in drops]
-    ev = sum(items[d['itemId']]['value'] * d['baseChance'] for d in drops)
-    cheapest = min(drops, key=lambda d: items[d['itemId']]['value'])
-    minimum = items[cheapest['itemId']]['value']
-    target = case['price'] * RTP
-    if not minimum <= target <= ev:
-        raise ValueError('Недопустимая конфигурация кейса')
-    scale = (target - minimum) / (ev - minimum) if ev != minimum else 1
-    return [dict(d, chance=d['baseChance']*scale + (1-scale if d is cheapest else 0)) for d in drops]
+    return [dict(d, chance=d['baseChance']) for d in drops]
 
 
 def roll_case(case, items, rng):
@@ -30,6 +21,15 @@ def roll_case(case, items, rng):
 
 
 def landing(chance, rng):
+    # The arrow is the only indicator: its tip crosses the liquid boundary.
+    level = 120 + math.cos(math.pi * chance) * 104
+    rng.draw()  # Keep the existing two-draw proof format for old clients.
+    angle = rng.draw() * math.tau
+    x, y = 120 + math.sin(angle)*104, 120 - math.cos(angle)*104
+    return dict(x=x, y=y, angle=angle/math.tau*360, win=chance > 0 and y >= level, level=level)
+
+
+def legacy_landing(chance, rng):
     low, high = -1., 1.
     for _ in range(40):
         y = (low + high)/2

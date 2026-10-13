@@ -1,5 +1,5 @@
 import { SETTINGS, ITEMS, ITEM_BY_ID, CASES, CASE_BY_ID, RARITIES } from './config.js';
-import { distribution, rollCase, randomUnit, upgradeChance, buildUpgradeStake, liquidLevel, upgradeLanding, settleSlots, newState, validateState, recordOperation, createPromo, redeemPromo, togglePromo, adjustBalance, startMines, revealMine, cashMines } from './engine.js';
+import { distribution, rollCase, randomUnit, upgradeChance, buildUpgradeStake, liquidLevel, upgradeLanding, legacyUpgradeLanding, settleSlots, newState, validateState, recordOperation, createPromo, redeemPromo, togglePromo, adjustBalance, startMines, revealMine, cashMines } from './engine.js';
 import { SoundEngine } from './audio.js';
 import { renderMines, renderHistory, renderAdmin, renderRocket, rocketGeometry } from './feature-views.js';
 import { startRocket, advanceRocket, cashRocket, rocketValue, rocketFinished, rollSlots } from './engine.js';
@@ -48,7 +48,7 @@ let displayedChance = 0, gaugeFrame = 0;
 let streamerMode=false;
 try {streamerMode=localStorage.getItem('brainrot-freebie-streamer')==='on';} catch {}
 document.body.classList.toggle('streamer-mode',streamerMode);
-let fastMode = false, slotUid = null;
+let fastMode = false, slotUid = null, rocketAmount = '';
 let mineUids = new Set(), mineCount = 5, historyFilter = 'all', historyLimit = 20;
 let rocketUids=new Set(), rocketAuto=false, rocketAutoTarget=2, rocketFrame=0, rocketCompletedId=null;
 try { const prefs=JSON.parse(localStorage.getItem('brainrot-freebie-rocket')); if (prefs && Number.isFinite(prefs.target) && prefs.target>=1.01 && prefs.target<=100) { rocketAuto=!!prefs.enabled; rocketAutoTarget=prefs.target; } } catch {}
@@ -131,7 +131,7 @@ function feedMarkup() {
 }
 const freeLabel=c=>({daily:'Раз в 24 часа',subscribe:'За подписку',referral:'По приглашению',nickname:'За ник'}[c.free] || 'Бесплатно');
 function renderCases() {
-  const groups=Object.groupBy ? Object.groupBy(CASES,c=>c.free ? 'Бесплатные' : c.theme || 'Классика') : CASES.reduce((a,c)=>{(a[c.free ? 'Бесплатные' : c.theme || 'Классика'] ||= []).push(c);return a;},{});
+  const groups=Object.fromEntries(['Бесплатные','Дешёвые','Средние','Мощные'].map(name=>[name,CASES.filter(c=>(c.free ? 'Бесплатные' : c.price<=199 ? 'Дешёвые' : c.price<=699 ? 'Средние' : 'Мощные')===name)]).filter(([,cases])=>cases.length));
   const top=state.topDrop, topItem=top && ITEM_BY_ID[top.itemId];
   return `${feedMarkup()}${topItem ? `<section class="top-drop"><img src="${topItem.image}" alt=""><div><small>ТОП ДРОП ДНЯ · МСК</small><h2>${esc(topItem.name)}</h2><span>${esc(top.playerName)} · ✦ ${money(topItem.value)}</span></div></section>` : ''}<div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div><nav class="theme-tabs">${Object.keys(groups).map((name,i)=>`<a href="#theme-${i}" data-theme="theme-${i}">${esc(name)}</a>`).join('')}</nav>${Object.entries(groups).map(([name,cases],i)=>`<section id="theme-${i}" class="case-theme"><h2>${esc(name)}</h2><div class="case-grid">${cases.map(c=>`<a href="#case/${c.id}" class="case-card" style="--hue:${c.hue}deg"><h3>${esc(c.name)}</h3><img class="case-art" src="${c.image}" onerror="this.onerror=null;this.src='img/cases/plant.png'" alt="Кейс ${esc(c.name)}"><span class="case-price">${c.free ? freeLabel(c) : `✦ ${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`).join('')}`;
 }
@@ -145,12 +145,12 @@ function shuffledBrainrots(caseConfig) {
 }
 function renderCase(caseConfig) {
   const preview = Array.from({length:Math.ceil(12 / caseConfig.drops.length)}, () => shuffledBrainrots(caseConfig)).flat();
-  const claim=state.freeClaims?.[caseConfig.id], unavailable=server && caseConfig.free && claim && (caseConfig.free!=='daily' || server.now()<claim+86400000);
+  const claim=state.freeClaims?.[caseConfig.id], recurring=['daily','subscribe','nickname'].includes(caseConfig.free), unavailable=server && caseConfig.free && claim && (!recurring || server.now()<claim+86400000);
   return `<a class="back" href="#cases">${icon('arrow')}Все кейсы</a><section class="case-open-page"><div class="case-page-heading"><h1>${caseConfig.name}</h1></div>
     <div class="roulette" aria-label="Рулетка открытия кейса"><div class="roulette-track">${preview.map(i => itemCard(i, { eager:true })).join('')}</div><div class="roulette-selection"></div></div>
-    <div class="open-controls"><button class="primary" data-action="open-case" data-id="${caseConfig.id}" ${state.balance < caseConfig.price || unavailable ? 'disabled' : ''}>${icon('box')}${caseConfig.free ? unavailable ? caseConfig.free!=='daily' ? 'Уже получен' : 'Доступен раз в 24 часа' : 'Открыть бесплатно' : `Открыть за <span class="coin">✦</span>${money(caseConfig.price)}`}</button>${fastButton()}</div>${caseBonusHint(caseConfig)}
+    <div class="open-controls"><div class="case-counts">${caseConfig.free ? `<button class="primary" data-action="open-case" data-count="1" data-id="${caseConfig.id}" ${unavailable ? 'disabled' : ''}>${icon('box')}${unavailable ? recurring ? 'Доступен раз в 24 часа' : 'Уже получен' : 'Открыть бесплатно'}</button>` : [1,3].map(count=>`<button class="${count===1 ? 'primary' : 'secondary'}" data-action="open-case" data-count="${count}" data-id="${caseConfig.id}" ${state.balance<caseConfig.price*count ? 'disabled' : ''}><strong>×${count}</strong><span>Открыть · ✦ ${money(caseConfig.price*count)}</span></button>`).join('')}</div>${fastButton()}</div>${caseBonusHint(caseConfig)}
     ${state.balance < caseConfig.price ? '<div class="demo-banner" style="margin:-16px 0 24px;text-align:center">Не хватает BStars. <button data-action="topup" style="color:var(--pink)">Пополнить баланс →</button></div>' : ''}
-    <div class="contents-heading"><h2>Что внутри кейса</h2><button class="info-link" data-action="case-odds" data-id="${caseConfig.id}">Базовые шансы ⓘ</button></div><div class="item-grid">${caseConfig.drops.map(d => itemCard(ITEM_BY_ID[d.itemId], { chance: d.baseChance })).join('')}</div>
+    <div class="contents-heading"><h2>Что внутри кейса</h2><button class="info-link" data-action="case-odds" data-id="${caseConfig.id}">Шансы выпадения ⓘ</button></div><div class="item-grid">${caseConfig.drops.map(d => itemCard(ITEM_BY_ID[d.itemId], { chance: d.baseChance })).join('')}</div>
     </section>`;
 }
 function inventoryEmpty(upgrade = false) {
@@ -182,9 +182,6 @@ function gauge(chance) {
       <g id="liquid-surface" transform="translate(0 ${level})"><path class="liquid-wave" d="M-240 0Q-210 -3-180 0T-120 0T-60 0T0 0T60 0T120 0T180 0T240 0T300 0T360 0T420 0T480 0" fill="none" stroke="#ffb7dc" stroke-width="1.2"/><path d="M0 0H240" stroke="#ffffff" stroke-opacity=".12" stroke-width=".5"/></g>
     </g><circle cx="120" cy="120" r="104" fill="none" stroke="#ffffff13" stroke-width="1"/>
     <path class="glass-highlight" d="M39 77a92 92 0 0 1 119-41" fill="none" stroke="#ffffff" stroke-opacity=".1" stroke-width="1.5"/>
-    <line id="landing-trail" x1="120" y1="120" x2="120" y2="120" stroke="#fff" stroke-width=".8" stroke-dasharray="2 3" opacity="0"/>
-    <circle id="landing-ripple" cx="120" cy="120" r="3" fill="none" stroke="#fff" stroke-width="1.5" opacity="0"/>
-    <circle id="landing-ring" cx="0" cy="0" r="7" fill="none" stroke="#fff" stroke-width="1.2" opacity="0"/><circle id="landing-dot" cx="0" cy="0" r="2.5" fill="#fff" stroke="#171020" stroke-width=".5" opacity="0"/>
     </svg><div class="gauge-copy"><strong>${percent(chance)}</strong><small>шанс успеха</small></div><div class="pointer-orbit"><svg class="pointer-tip" viewBox="0 0 16 20" aria-hidden="true"><path d="M1 1h14L8 18Z" fill="#ff9bce" stroke="#ffb5dc" stroke-width="1"/></svg></div></div>`;
 }
 function animateGauge(chance) {
@@ -216,7 +213,7 @@ function renderUpgrade() {
   if (source && getTarget()?.value <= source.value) targetId = null;
   const target = getTarget(); const chance = upgradeChance(source, target);
   return `<div class="page-head upgrade-head compact-head"><h1>Апгрейдер</h1></div>
-    <section aria-label="Апгрейдер"><div class="upgrade-machine"><div class="upgrade-stage">${sourceSlotMarkup(source)}${gauge(chance)}${slotMarkup(target, 'ЦЕЛЕВОЙ ПРЕДМЕТ')}</div><div class="upgrade-controls"><div class="quick-buttons" aria-label="Подбор цели по шансу">${[75,50,20].map(p => `<button data-action="quick" data-id="${p}" class="${quick === p ? 'active' : ''}">${p}%</button>`).join('')}</div><div class="game-actions"><button class="primary" data-action="upgrade" ${!chance ? 'disabled' : ''}>${icon('upgrade')}Апгрейдить</button>${fastButton()}</div><p class="upgrade-hint">${source && target ? 'Попадание в заполненную область — успех. При неудаче выбранные предметы теряются.' : source && source.value >= Math.max(...ITEMS.map(i=>i.value)) ? 'Нет цели дороже суммы выбранных предметов' : 'Выбери один или несколько предметов и цель'}</p></div></div>
+    <section aria-label="Апгрейдер"><div class="upgrade-machine"><div class="upgrade-stage">${sourceSlotMarkup(source)}${gauge(chance)}${slotMarkup(target, 'ЦЕЛЕВОЙ ПРЕДМЕТ')}</div><div class="upgrade-controls"><div class="quick-buttons" aria-label="Подбор цели по шансу">${[75,50,20].map(p => `<button data-action="quick" data-id="${p}" class="${quick === p ? 'active' : ''}">${p}%</button>`).join('')}</div><div class="game-actions"><button class="primary" data-action="upgrade" ${!chance ? 'disabled' : ''}>${icon('upgrade')}Апгрейдить</button>${fastButton()}</div><p class="upgrade-hint">${source && target ? 'Остановка стрелки в заполненной области — успех. При неудаче выбранные предметы теряются.' : source && source.value >= Math.max(...ITEMS.map(i=>i.value)) ? 'Нет цели дороже суммы выбранных предметов' : 'Выбери один или несколько предметов и цель'}</p></div></div>
     <div class="selection-columns"><section class="selection-panel"><div class="selection-title"><h2>Твой инвентарь</h2><span>${state.inventory.length} шт.</span></div>${state.inventory.length ? `<div class="stake-summary"><span>Выбрано: ${sourceUids.size}<strong>✦ ${money(source?.value || 0)}</strong></span><button data-action="clear-source" ${sourceUids.size ? '' : 'disabled'}>Сбросить</button></div><div class="item-grid">${state.inventory.map(i => itemCard(ITEM_BY_ID[i.itemId], { action: 'select-source', id: i.uid, selected: sourceUids.has(i.uid) })).join('')}</div>` : inventoryEmpty(true)}</section>
     <section class="selection-panel"><div class="selection-title"><h2>Хочу получить</h2><span>BStars</span></div><label class="search">${icon('search')}<input id="target-search" type="search" value="${esc(targetSearch)}" placeholder="Найти брейнрота" aria-label="Найти желаемого брейнрота"></label><div class="item-grid" id="target-grid">${targetsMarkup()}</div></section></div></section>`;
 }
@@ -245,7 +242,7 @@ function renderQuests() {
   return `<div class="compact-head"><h1>Квесты</h1><span>Каждый день</span></div><p class="quest-reset">Обновление в 00:00 МСК</p><div class="quests-grid">${q.items.map(i=>`<section class="quest-card"><div class="quest-icon">${icon(({case:'box',upgrade:'upgrade',slots:'slots',mines:'mines',rocket:'rocket'})[i.kind] || 'gift')}</div><h2>${esc(i.title)}</h2><strong class="quest-reward">✦ ${money(i.reward)} BStars</strong><progress value="${i.progress}" max="${i.goal}"></progress><div class="quest-progress">${i.progress} / ${i.goal}</div><button class="${i.claimed ? 'secondary' : 'primary'}" data-action="quest-claim" data-id="${i.id}" ${i.claimed || i.progress<i.goal ? 'disabled' : ''}>${i.claimed ? 'Награда получена' : i.progress>=i.goal ? 'Забрать награду' : 'Выполни задание'}</button></section>`).join('')}</div>`;
 }
 function settingsDialog() {
-  openModal(`<div class="modal-content settings-modal"><h2>Настройки</h2><div class="settings-row"><div><strong>Звук</strong><p>Нажатия и игровые эффекты</p></div><button class="secondary" data-action="settings-sound" aria-pressed="${sound.enabled}">${sound.enabled ? 'Включён' : 'Выключен'}</button></div><div class="settings-row"><div><strong>Режим стримера</strong><p>Размывает пополнение, вывод, баланс и личные данные</p></div><button class="secondary" data-action="settings-streamer" aria-pressed="${streamerMode}">${streamerMode ? 'Включён' : 'Выключен'}</button></div><p class="settings-version">Brainrot Freebie · версия ${esc(server?.config?.version || '1.4.1')}</p></div>`);
+  openModal(`<div class="modal-content settings-modal"><h2>Настройки</h2><div class="settings-row"><div><strong>Звук</strong><p>Нажатия и игровые эффекты</p></div><button class="secondary" data-action="settings-sound" aria-pressed="${sound.enabled}">${sound.enabled ? 'Включён' : 'Выключен'}</button></div><div class="settings-row"><div><strong>Режим стримера</strong><p>Размывает пополнение, вывод, баланс и личные данные</p></div><button class="secondary" data-action="settings-streamer" aria-pressed="${streamerMode}">${streamerMode ? 'Включён' : 'Выключен'}</button></div><p class="settings-version">Brainrot Freebie · версия ${esc(server?.config?.version || '1.5.0')}</p></div>`);
 }
 function subscriptionPrompt() {
   openModal('<div class="modal-content"><h2>Кейс за подписку</h2><p>Подпишись на канал, затем вернись и снова нажми «Открыть».</p><div class="modal-actions"><button class="primary" data-action="join-channel">Открыть канал</button><button class="secondary" data-action="close-modal">Я подписался</button></div></div>');
@@ -285,6 +282,7 @@ function parseRoute() {
   return ['rocket','mines','admin','slots','upgrade','profile','cases','quests'].includes(hash) || (hash.startsWith('case/') && CASE_BY_ID[hash.slice(5)]) ? hash : 'cases';
 }
 function render({ scroll = false } = {}) {
+  const pageScroll=window.scrollY, gridScroll=[...document.querySelectorAll('.item-grid')].map(g=>g.scrollTop);
   if (server?.locked) { $('#main').innerHTML=`<section class="empty-state"><h1>${server.maintenance ? 'Бот на обновлении' : 'Brainrot Freebie'}</h1><p>${esc(server.message)}</p>${server.maintenance ? '<p>Снова открой приложение немного позже.</p>' : ''}</section>`; $('#balance').textContent='0'; $('.bottom-nav').hidden=true; $('.balance').disabled=true; return; }
   cancelAnimationFrame(gaugeFrame);
   const route = parseRoute(); activeRoute = route;
@@ -293,20 +291,17 @@ function render({ scroll = false } = {}) {
   rocketUids=new Set([...rocketUids].filter(uid=>state.inventory.some(entry=>entry.uid===uid)));
   if (state.mines?.status==='active') mineCount=state.mines.bombCount;
   const rocketState=server ? {...state,rocket:sharedRocket(state)} : state;
-  $('#main').innerHTML = route.startsWith('case/') ? renderCase(CASE_BY_ID[route.slice(5)]) : route === 'upgrade' ? renderUpgrade() : route==='quests' ? renderQuests() : route === 'slots' ? renderSlots() : route==='rocket' ? renderRocket(rocketState,rocketUids,rocketAuto,rocketAutoTarget,{...featureUI,server:!!server,now:server?.now}) : route==='mines' ? renderMines(state,mineUids,mineCount,featureUI) : route==='admin' ? server && !state.isAdmin ? '<div class="empty-state">Доступ запрещён</div>' : renderAdmin(state,playerName,{...featureUI,server:!!server}) : route === 'profile' ? renderProfile() : renderCases();
+  $('#main').innerHTML = route.startsWith('case/') ? renderCase(CASE_BY_ID[route.slice(5)]) : route === 'upgrade' ? renderUpgrade() : route==='quests' ? renderQuests() : route === 'slots' ? renderSlots() : route==='rocket' ? renderRocket(rocketState,rocketUids,rocketAuto,rocketAutoTarget,{...featureUI,rocketAmount,server:!!server,now:server?.now}) : route==='mines' ? renderMines(state,mineUids,mineCount,featureUI) : route==='admin' ? server && !state.isAdmin ? '<div class="empty-state">Доступ запрещён</div>' : renderAdmin(state,playerName,{...featureUI,server:!!server}) : route === 'profile' ? renderProfile() : renderCases();
   if (server && route==='profile') enhanceServerProfile();
   if(server) {
     if(state.gamesPaused) $('#main').insertAdjacentHTML('afterbegin','<p class="service-notice">Приём новых ставок приостановлен. Активные игры можно завершить.</p>');
-    if(['upgrade','slots','mines','rocket'].includes(route)) {
-      const maxStake=route==='rocket' ? Math.min(state.limits.max_stake,state.limits.max_payout/100) : route==='slots' ? Math.min(state.limits.max_stake,state.limits.max_payout/5) : state.limits.max_stake;
-      $('.compact-head')?.insertAdjacentHTML('afterend',`<p class="game-limits">Макс. ставка: ${money(maxStake)} BStars · Макс. выплата: ${money(state.limits.max_payout)} BStars${route==='rocket' ? `<br>Общий лимит ставок раунда: ${money(state.round?.maxTotalStake || state.limits.rocket_round_stake)} BStars` : ''}</p>`);
-    }
     if(state.gamesPaused) document.querySelectorAll('[data-action="open-case"],[data-action="upgrade"],[data-action="spin-slots"],[data-action="mine-start"],[data-action="rocket-start"]').forEach(b=>b.disabled=true);
     if(route==='admin' && state.isAdmin) enhanceFinancialAdmin();
   }
   document.querySelectorAll('[data-tab]').forEach(el => { el.classList.toggle('active', el.dataset.tab === tab); if (el.dataset.tab === tab) el.setAttribute('aria-current','page'); else el.removeAttribute('aria-current'); });
   $('#balance').textContent = money(state.balance);
   if (isTelegram) { try { route === 'cases' ? tg.BackButton.hide() : tg.BackButton.show(); } catch {} }
+  if(!scroll) {document.querySelectorAll('.item-grid').forEach((g,i)=>{g.scrollTop=gridScroll[i] || 0;});window.scrollTo({top:pageScroll,behavior:'instant'});}
   if (scroll) { window.scrollTo({ top: 0, behavior: 'instant' }); $('#main').focus({ preventScroll: true }); }
   if (route.startsWith('case/')) centerPreview();
   if (route === 'upgrade') animateGauge(upgradeChance(getSource(), getTarget()));
@@ -340,35 +335,49 @@ function watchTicks(animation, count) {
   frameId = requestAnimationFrame(frame);
   return () => { stopped = true; cancelAnimationFrame(frameId); };
 }
-async function openCase(caseId) {
+async function openCase(caseId,count=1) {
   if (busy) return;
-  const c = CASE_BY_ID[caseId]; if (!c || state.balance < c.price) return toast('Не хватает BStars. Пополни баланс в профиле.');
-  const fast = fastMode || reducedMotion.matches;
-  const response=server ? await serverAction('case',{caseId}) : null;
-  if (server && !response) return;
-  const itemId = server ? response.result.itemId : rollCase(c), item = ITEM_BY_ID[itemId];
-  // Commit the complete outcome before animation: closing/reloading cannot lose
-  // a charged item or replay a pending transaction.
-  let uid=response?.result.uid;
-  if (!server) { state.balance -= c.price; uid = addInventory(itemId); state.stats.opened++; pushFeed(itemId);
-  state = recordOperation(state,{type:'case',title:`Кейс · ${c.name}`,detail:`Получен ${item.name} · стоимость ${item.value} BStars`,delta:-c.price}); } persist();
-  setBusy(true); haptic('medium');
-  const button = $('[data-action="open-case"]'); button.disabled = true; button.textContent = 'Открываем…';
-  const track = $('.roulette-track');
-  // Animate only this case's contents; the winning item is already determined.
-  const sequence = Array.from({length:Math.ceil(44 / c.drops.length)}, () => shuffledBrainrots(c)).flat(); sequence[28] = item;
-  track.innerHTML = sequence.map(i => itemCard(i, { eager:true })).join('');
-  const first = track.children[3], winner = track.children[28];
-  const start = $('.roulette').clientWidth/2 - first.offsetLeft - first.offsetWidth/2;
-  const end = $('.roulette').clientWidth/2 - winner.offsetLeft - winner.offsetWidth/2;
-  let stopTicks = () => {};
+  const c=CASE_BY_ID[caseId];
+  if (!c || ![1,3].includes(count) || c.free && count!==1) return;
+  if(state.balance<c.price*count)return toast('Не хватает BStars. Пополни баланс в профиле.');
+  const fast=fastMode || reducedMotion.matches;
+  const response=server ? await serverAction('case',{caseId,count}) : null;
+  if(server && !response)return;
+  const drops=server ? response.result.drops || [response.result] : [];
+  if(!server) {
+    state.balance-=c.price*count;
+    for(let n=0;n<count;n++) {
+      const itemId=rollCase(c),item=ITEM_BY_ID[itemId],uid=addInventory(itemId);
+      drops.push({itemId,uid});state.stats.opened++;pushFeed(itemId);
+      state=recordOperation(state,{type:'case',title:`Кейс · ${c.name}`,detail:`Получен ${item.name} · стоимость ${item.value} BStars`,delta:-c.price});
+    }
+  }
+  persist();setBusy(true);haptic('medium');
+  document.querySelectorAll('[data-action="open-case"]').forEach(button=>{button.disabled=true;button.textContent='Открываем…';});
+  const track=$('.roulette-track');
   try {
-    const animation = track.animate([{ transform: `translateX(${start}px)` }, { transform: `translateX(${end}px)` }], { duration: fast ? 350 : 4700, easing:'cubic-bezier(.12,.7,.12,1)', fill:'forwards' });
-    stopTicks = watchTicks(animation,25); await animation.finished;
-    track.style.transform = `translateX(${end}px)`; animation.cancel();
-  } catch { track.style.transform = `translateX(${end}px)`; } finally { stopTicks(); }
-  sound.play('win');
-  setBusy(false); notifyHaptic(true); button.disabled = state.balance < c.price || !!(server && c.free); button.innerHTML = c.free ? c.free==='daily' ? 'Доступен раз в 24 часа' : 'Уже получен' : `${icon('box')}Открыть за <span class="coin">✦</span>${money(c.price)}`;
+    for(const drop of drops) {
+      const item=ITEM_BY_ID[drop.itemId];
+      const sequence=Array.from({length:Math.ceil(44/c.drops.length)},()=>shuffledBrainrots(c)).flat();sequence[28]=item;
+      track.innerHTML=sequence.map(i=>itemCard(i,{eager:true})).join('');
+      const first=track.children[3],winner=track.children[28],width=$('.roulette').clientWidth;
+      const start=width/2-first.offsetLeft-first.offsetWidth/2,end=width/2-winner.offsetLeft-winner.offsetWidth/2;
+      track.style.transform=`translateX(${start}px)`;
+      let stopTicks=()=>{};
+      try {
+        const animation=track.animate([{transform:`translateX(${start}px)`},{transform:`translateX(${end}px)`}],{duration:fast ? 350 : count===3 ? 1700 : 4700,easing:'cubic-bezier(.12,.7,.12,1)',fill:'forwards'});
+        stopTicks=watchTicks(animation,25);await animation.finished;track.style.transform=`translateX(${end}px)`;animation.cancel();
+      } catch {track.style.transform=`translateX(${end}px)`;} finally {stopTicks();}
+      sound.play('win');notifyHaptic(true);
+    }
+  } finally {setBusy(false);}
+  render();
+  if(drops.length>1) {
+    const total=drops.reduce((sum,d)=>sum+ITEM_BY_ID[d.itemId].value,0);
+    openModal(`<div class="modal-content bulk-results"><h2>Получено ${drops.length} предмета</h2><div class="case-results">${drops.map(d=>{const item=ITEM_BY_ID[d.itemId];return `<div class="case-result ${item.rarity}"><img src="${item.image}" alt="${esc(item.name)}"><strong>${esc(item.name)}</strong><span>✦ ${money(item.value)}</span></div>`;}).join('')}</div><p>Общая стоимость: <strong>✦ ${money(total)} BStars</strong></p><div class="modal-actions"><button class="primary" data-action="keep-drop">Оставить все</button><a class="secondary" href="#profile">Инвентарь</a></div></div>`);
+    return;
+  }
+  const {itemId,uid}=drops[0],item=ITEM_BY_ID[itemId];
   openModal(`<div class="modal-content ${item.rarity}"><h2>Получен предмет</h2><div class="result-art"><img src="${item.image}" alt="${esc(item.name)}"></div><div class="result-name">${esc(item.name)}</div><div class="result-value">✦ ${money(item.value)} <small style="font-size:11px">BStars</small></div><div class="result-rarity">${RARITIES[item.rarity]}</div><div class="modal-actions"><button class="primary" data-action="keep-drop">Оставить</button><button class="secondary" data-action="confirm-sell" data-id="${uid}">Продать · ${money(item.value)}</button></div><button class="info-link" style="margin:19px auto 0" data-action="to-upgrade" data-id="${uid}">В апгрейдер ↗</button></div>`);
 }
 function sellDialog(uid) {
@@ -418,36 +427,14 @@ async function upgrade() {
   let stopTicks = () => {};
   try { const animation = pointer.animate([{transform:'rotate(0deg)'},{transform:`rotate(${turns}deg)`}],{duration:fast ? 260 : 3900,easing:'cubic-bezier(.14,.65,.12,1)',fill:'forwards'}); stopTicks = watchTicks(animation,turns/12); await animation.finished; pointer.style.transform=`rotate(${turns}deg)`; animation.cancel(); } catch { pointer.style.transform=`rotate(${turns}deg)`; } finally { stopTicks(); }
   $('.upgrade-circle').classList.remove('spinning'); $('.upgrade-circle').classList.add('landing');
-  const angle = landing.angle * Math.PI / 180;
-  const startX = 120 + Math.sin(angle) * 104, startY = 120 - Math.cos(angle) * 104;
-  pointer.style.opacity='0';
-  $('.liquid-wave').style.visibility='hidden';
   cancelAnimationFrame(gaugeFrame);
-  const exactLevel=Number.isFinite(landing.level) ? landing.level : liquidLevel(chance); $('#liquid-body').setAttribute('y',exactLevel); $('#water-mask').setAttribute('y',exactLevel); $('#liquid-surface').setAttribute('transform',`translate(0 ${exactLevel})`);
-  const dot = $('#landing-dot'), ring=$('#landing-ring'), trail = $('#landing-trail'), ripple = $('#landing-ripple');
-  dot.setAttribute('opacity', '1'); ring.setAttribute('opacity','1'); trail.setAttribute('opacity', '.5');
+  const exactLevel=Number.isFinite(landing.level) ? landing.level : liquidLevel(chance);
+  $('#liquid-body').setAttribute('y',exactLevel); $('#water-mask').setAttribute('y',exactLevel); $('#liquid-surface').setAttribute('transform',`translate(0 ${exactLevel})`);
+  $('.liquid-wave').style.visibility='hidden';
   $('.gauge-copy strong').textContent=percent(chance);
-  $('.upgrade-hint').textContent='Результат определяется по центру метки.';
-  trail.setAttribute('x1', startX); trail.setAttribute('y1', startY);
-  await new Promise(resolve => {
-    const start = performance.now();
-    function frame(now) {
-      const t = reducedMotion.matches ? 1 : Math.max(0, Math.min((now-start)/(fast ? 100 : 650),1)), eased = 1-(1-t)**3;
-      const x = startX + (landing.x-startX)*eased, y = startY + (landing.y-startY)*eased;
-      dot.setAttribute('transform',`translate(${x} ${y})`); ring.setAttribute('transform',`translate(${x} ${y})`); trail.setAttribute('x2',x); trail.setAttribute('y2',y);
-      if (t < 1) requestAnimationFrame(frame); else resolve();
-    }
-    requestAnimationFrame(frame);
-  });
-  dot.setAttribute('transform',`translate(${landing.x} ${landing.y})`);ring.setAttribute('transform',`translate(${landing.x} ${landing.y})`);
-  $('.upgrade-hint').textContent=win ? 'Центр метки в заполненной области — выигрыш.' : 'Центр метки вне заполненной области — проигрыш.';
-  ripple.setAttribute('cx',landing.x); ripple.setAttribute('cy',landing.y); ripple.setAttribute('opacity','1');
+  $('.upgrade-hint').textContent=win ? 'Стрелка в заполненной области — выигрыш.' : 'Стрелка вне заполненной области — проигрыш.';
   $('.upgrade-circle').classList.add(win ? 'won' : 'lost'); notifyHaptic(win);
   sound.play(win ? 'win' : 'lose');
-  if (!reducedMotion.matches) {
-    const rippleAnimation = ripple.animate([{transform:'scale(1)',opacity:1},{transform:'scale(7)',opacity:0}],{duration:fast ? 160 : 850,easing:'ease-out'});
-    try { await rippleAnimation.finished; } catch {}
-  }
   await new Promise(resolve=>setTimeout(resolve,fast ? 400 : 900));
   setBusy(false); sourceUids.clear(); targetId = null; quick = null; render();
   openModal(`<div class="modal-content ${win ? target.rarity : source.rarity}"><h2>${win ? 'Апгрейд выполнен' : 'Апгрейд не удался'}</h2>${win ? `<div class="result-art"><img src="${target.image}" alt="${esc(target.name)}"></div><div class="result-name">${esc(target.name)}</div><div class="result-value">✦ ${money(target.value)}</div>` : '<div class="modal-status-icon" style="color:#e38fa9">↺</div>'}<p style="margin-top:14px">${win ? 'Предмет добавлен в инвентарь.' : `Потрачено предметов: ${stake.entries.length} · ✦ ${money(stake.value)}`}<br>Шанс: ${percent(chance)}.</p><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button>${win ? `<button class="secondary" data-action="to-upgrade" data-id="${wonUid}">Ещё апгрейд</button>` : '<button class="secondary" data-action="goto-cases">К кейсам</button>'}</div></div>`);
@@ -493,8 +480,8 @@ async function spinSlots() {
 function fairness(caseId) {
   const c = CASE_BY_ID[caseId];
   if (!c) return;
-  const rows = distribution(c).map(d => `<tr><td>${esc(ITEM_BY_ID[d.itemId].name)}</td><td>${percent(d.baseChance)}</td><td>${percent(d.chance)}</td></tr>`).join('');
-  openModal(`<div class="modal-content"><h2>${c.name} · шансы</h2><div class="fairness-text"><table class="fairness-table"><thead><tr><th>Предмет</th><th>Базовый шанс</th><th>Шанс выпадения</th></tr></thead><tbody>${rows}</tbody></table></div><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button></div></div>`);
+  const rows = distribution(c).map(d => `<tr><td>${esc(ITEM_BY_ID[d.itemId].name)}</td><td>${percent(d.chance)}</td></tr>`).join('');
+  openModal(`<div class="modal-content"><h2>${c.name} · шансы</h2><div class="fairness-text"><table class="fairness-table"><thead><tr><th>Предмет</th><th>Шанс выпадения</th></tr></thead><tbody>${rows}</tbody></table></div><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button></div></div>`);
 }
 function topup() { if (server) return depositDialog(); state.balance += SETTINGS.topUp; state = recordOperation(state,{type:'topup',title:'Пополнение',detail:'Начисление BStars',delta:SETTINGS.topUp}); persist(); closeModal(); render(); haptic(); toast(`Пополнение +${SETTINGS.topUp} BStars`); }
 
@@ -515,12 +502,18 @@ function rocketResult() {
   toast(game.status==='won' ? `${game.automatic ? 'Автозабор' : 'Забрано'} ×${game.cashAt.toFixed(2)} · +${money(game.payout)} BStars` : `Взрыв на ×${(Math.floor(game.crash*100)/100).toFixed(2)}`);
 }
 async function rocketAction(action) {
-  if (server) { const response=await serverAction(action==='rocket-start' ? 'rocket-bet' : 'rocket-cash',action==='rocket-start' ? {roundId:state.round.id,uids:[...rocketUids],autoCash:rocketAuto ? Number($('#rocket-auto-value').value) : null} : {}); if(response) {rocketUids.clear(); render(); if(state.rocket.status!=='active') rocketResult();} return; }
+  const starting=action==='rocket-start',amount=rocketAmount.trim() ? Number(rocketAmount) : null;
+  const autoCash=rocketAuto ? Number($('#rocket-auto-value').value) : null;
+  if(server) {
+    const response=await serverAction(starting ? 'rocket-bet' : 'rocket-cash',starting ? {roundId:state.round.id,uids:amount===null ? [...rocketUids] : [],...(amount===null ? {} : {amount}),autoCash} : {});
+    if(response){rocketUids.clear();rocketAmount='';render();if(state.rocket.status!=='active')rocketResult();}
+    return;
+  }
   try {
-    if (action==='rocket-start') { state=startRocket(state,rocketUids,rocketAuto ? Number($('#rocket-auto-value').value) : null); rocketUids.clear(); rocketCompletedId=null; sound.play('tick'); }
-    else { state=cashRocket(state); rocketResult(); }
-    persist(); render();
-  } catch(error) { toast(error.message); }
+    if(starting){state=startRocket(state,rocketUids,autoCash,undefined,Date.now(),amount);rocketUids.clear();rocketAmount='';rocketCompletedId=null;sound.play('tick');}
+    else {state=cashRocket(state);rocketResult();}
+    persist();render();
+  } catch(error){toast(error.message);}
 }
 function runRocket() {
   if (server) { runServerRocket(); return; }
@@ -587,7 +580,8 @@ function runServerRocket() {
     $('#rocket-ship').setAttribute('transform',`translate(${geo.x} ${geo.y}) rotate(${geo.angle})`); $('#rocket-blast').setAttribute('transform',`translate(${geo.x} ${geo.y})`);
     const cash=$('[data-action="rocket-cash"]'); if(cash) cash.disabled=busy||countdown||game.status!=='active'||game.ended;
     const stake=state.inventory.filter(e=>rocketUids.has(e.uid)).reduce((s,e)=>s+ITEM_BY_ID[e.itemId].value,0);
-    const launch=$('[data-action="rocket-start"]'); if(launch) launch.disabled=busy||state.gamesPaused||!canSelectRocket()||!rocketUids.size||stake>Math.min(state.limits.max_stake,state.limits.max_payout/100);
+    const amount=rocketAmount.trim() ? Number(rocketAmount) : null, canBet=amount===null ? rocketUids.size>0 : Number.isFinite(amount)&&amount>=.01&&amount<=state.balance&&Math.abs(amount*100-Math.round(amount*100))<1e-7;
+    const launch=$('[data-action="rocket-start"]'); if(launch)launch.disabled=busy||state.gamesPaused||!canSelectRocket()||!canBet;
     if($('#rocket-cash-value')) $('#rocket-cash-value').textContent=money(Math.round(game.stakeValue*Math.floor(value*100))/100);
     serverRocketFrame=requestAnimationFrame(frame);
   }
@@ -608,19 +602,19 @@ function withdrawalDialog() {
   openModal(`<div class="modal-content wallet-modal"><h2>Вывод брейнротов</h2><p>Выбери предметы. До решения администратора они будут заблокированы.</p><div class="item-grid wallet-item-grid" aria-label="Предметы для вывода">${eligible.map(e=>walletCard(ITEM_BY_ID[e.itemId],{action:'select-withdraw',id:e.uid,selected:false})).join('')}</div>${eligible.length ? '<div class="wallet-selection"><span id="withdraw-summary">Выбрано: 0 · ✦ 0</span><button class="primary" data-action="withdraw-submit" disabled>Создать заявку</button></div>' : '<p>Для вывода нужны Ketupat Kepat, Garama, Cerberus или Dragon Cannelloni.</p>'}</div>`);
 }
 function ownerContact(requestId) {
-  const request=(state.transfers || []).find(t=>t.id===requestId);
-  const deposit=request?.kind==='deposit', username=server.config.botUsername;
-  const url=username ? `https://t.me/${username}?start=dep_${requestId}` : '';
-  openModal(`<div class="modal-content wallet-modal"><h2>${deposit ? 'Депозит создан' : 'Заявка создана'}</h2><p>Номер: ${esc(requestId)}.</p>${deposit ? '<p>Владелец получил уведомление. Обсуди передачу предмета в диалоге через бота. BStars поступят после подтверждения.</p>' : '<p>Заявка передана владельцу. Её статус отображается в профиле.</p>'}${deposit && url ? `<a class="primary" data-action="deposit-chat" href="${esc(url)}" target="_blank" rel="noopener">Открыть диалог в боте</a>` : deposit ? '<p>Открой нашего бота и отправь /deposits.</p>' : ''}</div>`);
+  const request=(state.transfers || []).find(t=>t.id===requestId),deposit=request?.kind==='deposit';
+  const url='https://t.me/BrainrotFreebie_deposit_bot';
+  openModal(`<div class="modal-content wallet-modal"><h2>${deposit ? 'Депозит создан' : 'Заявка создана'}</h2><p>Номер: ${esc(requestId)}.</p>${deposit ? '<p>Для передачи предмета открой @BrainrotFreebie_deposit_bot. BStars поступят после подтверждения депозита.</p>' : '<p>Заявка передана владельцу. Её статус отображается в профиле.</p>'}${deposit ? `<a class="primary" data-action="deposit-bot" href="${esc(url)}" target="_blank" rel="noopener">Открыть бота пополнений</a>` : ''}</div>`);
+  if(deposit && tg?.openTelegramLink)tg.openTelegramLink(url);
 }
 function enhanceServerProfile() {
   if (!state.isAdmin) $('a.admin-link')?.remove();
   $('.storage-error')?.remove();
   if(state.debt || state.refundReviewPending || state.withdrawHeldUntil>server.now()) $('.profile-card').insertAdjacentHTML('afterend',`<p class="service-notice">${state.debt ? `Задолженность после возврата Stars: ${money(state.debt)} BStars. Обратись в поддержку.` : state.refundReviewPending ? 'Возврат Stars уточняется, вывод временно ограничен.' : `Вывод доступен с ${new Date(state.withdrawHeldUntil).toLocaleString('ru-RU')}.`}</p>`);
-  $('.profile-card').insertAdjacentHTML('afterend',`<section class="history-panel"><details><summary>Проверка честности</summary><p class="proof-text">Server hash: ${esc(state.fair.serverHash)}<br>Client seed: ${esc(state.fair.clientSeed)}<br>Nonce: ${state.fair.nonce}</p><form id="fair-form" class="admin-form"><label>Новый client seed<input name="clientSeed" required maxlength="80" value="${esc(state.fair.clientSeed)}"></label><button class="secondary">Раскрыть старый seed и сменить</button></form></details></section><section class="history-panel"><h2>Заявки</h2>${state.transfers.filter(t=>!t.userId || t.userId===state.profile.id).map(t=>`<p class="proof-text">${t.kind==='deposit' ? 'Депозит' : 'Вывод'} · ${esc(t.id)} · ${{pending:'Ожидает',approved:'Подтверждена',rejected:'Отклонена'}[t.status] || esc(t.status)}${t.kind==='deposit' && t.status==='pending' && server.config.botUsername ? `<br><a class="info-link" data-action="deposit-chat" href="https://t.me/${esc(server.config.botUsername)}?start=dep_${esc(t.id)}" target="_blank" rel="noopener">Диалог по депозиту в боте</a>` : ''}</p>`).join('') || '<p class="proof-text">Заявок пока нет</p>'}</section>`);
+  $('.profile-card').insertAdjacentHTML('afterend',`<section class="history-panel"><details><summary>Проверка честности</summary><p class="proof-text">Server hash: ${esc(state.fair.serverHash)}<br>Client seed: ${esc(state.fair.clientSeed)}<br>Nonce: ${state.fair.nonce}</p><form id="fair-form" class="admin-form"><label>Новый client seed<input name="clientSeed" required maxlength="80" value="${esc(state.fair.clientSeed)}"></label><button class="secondary">Раскрыть старый seed и сменить</button></form></details></section><section class="history-panel"><h2>Заявки</h2>${state.transfers.filter(t=>!t.userId || t.userId===state.profile.id).map(t=>`<p class="proof-text">${t.kind==='deposit' ? 'Депозит' : 'Вывод'} · ${esc(t.id)} · ${{pending:'Ожидает',approved:'Подтверждена',rejected:'Отклонена'}[t.status] || esc(t.status)}${t.kind==='deposit' && t.status==='pending' ? `<br><a class="info-link" data-action="deposit-bot" href="https://t.me/BrainrotFreebie_deposit_bot" target="_blank" rel="noopener">Открыть бота пополнений</a>` : ''}</p>`).join('') || '<p class="proof-text">Заявок пока нет</p>'}</section>`);
 }
 function enhanceFinancialAdmin() {
-  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel" data-admin-section="money"><div class="selection-title"><h2>Контроль операций</h2></div><section style="margin:18px 0;padding:18px;border:1px solid #ffffff20;border-radius:16px"><h3>${state.maintenance ? 'Приложение закрыто на обновление' : 'Приложение открыто'}</h3><p>Во время обновления доступ есть только у администраторов. Статус сохранён в базе и переживает перезапуск. Перед закрытием приостанови ставки и дождись окончания активных игр.</p><button class="primary" data-action="admin-maintenance">${state.maintenance ? 'Открыть приложение' : 'Закрыть на обновление'}</button></section><p class="proof-text">Максимальная выплата: ${money(state.limits.max_payout)} BStars<br>Лимит активного риска: ${money(state.limits.max_open_risk)} BStars</p><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
+  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel" data-admin-section="money"><div class="selection-title"><h2>Контроль операций</h2></div><section style="margin:18px 0;padding:18px;border:1px solid #ffffff20;border-radius:16px"><h3>${state.maintenance ? 'Приложение закрыто на обновление' : 'Приложение открыто'}</h3><p>Во время обновления доступ есть только у администраторов. Статус сохранён в базе и переживает перезапуск. Перед закрытием приостанови ставки и дождись окончания активных игр.</p><button class="primary" data-action="admin-maintenance">${state.maintenance ? 'Открыть приложение' : 'Закрыть на обновление'}</button></section><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
 }
 async function downloadBackup() {
   try {const blob=await server.download('/api/admin/backup'), url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='freebie-backup.sqlite3';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);} catch(error){toast(error.message);}
@@ -672,7 +666,7 @@ async function showProof(id) {
     else {
       const draws=checked.draws; let result;
       if(proof.game==='case') { if(proof.table) {let cumulative=0;result=proof.table.find(d=>(cumulative+=d.chance)>draws[0])?.itemId || proof.table.at(-1).itemId;} else result=rollCase(CASE_BY_ID[proof.caseId],draws[0]); }
-      else if(proof.game==='upgrade') result=upgradeLanding(proof.chance,draws[0],draws[1]);
+      else if(proof.game==='upgrade') result=(proof.geometry==='arrow' ? upgradeLanding : legacyUpgradeLanding)(proof.chance,draws[0],draws[1]);
       else if(proof.game==='slots') {let cursor=1;result=rollSlots(1,draws[0],()=>draws[cursor++],{tripleChance:.03,pairChance:((proof.rtp || .85)-.15)/2},proof.itemIds || ["67", "lagrand", "bananito", "esok", "ketupat", "tictac", "lavadorito", "garama", "eviledon", "cash", "pizza", "burguro", "capitano", "cerberus", "pegasus", "guest666", "cookie", "fortunu", "ketupatbro", "foxini", "venuspino", "dragon"]).symbols;}
       else if(proof.game==='mines') {const pool=Array.from({length:25},(_,i)=>i);result=Array.from({length:proof.bombCount},(_,i)=>pool.splice(Math.floor(draws[i]*pool.length),1)[0]);}
       else result=Math.min(100,draws[0]<(1-(proof.rtp || .85)) ? 1 : (proof.rtp || .85)/(1-draws[0]));
@@ -702,8 +696,8 @@ document.addEventListener('click', event => {
     case 'fair-proof': void showProof(id); break;
     case 'copy-proof': void navigator.clipboard.writeText(JSON.stringify(currentProof,null,2)).then(()=>toast('Данные проверки скопированы')).catch(()=>toast('Браузер не разрешил копирование')); break;
     case 'rocket-start': case 'rocket-cash': rocketAction(action); break;
-    case 'select-rocket': if (canSelectRocket()) { rocketUids.has(id) ? rocketUids.delete(id) : rocketUids.add(id); render(); haptic(); } break;
-    case 'rocket-clear': rocketUids.clear(); render(); break;
+    case 'select-rocket': if (canSelectRocket()) { rocketAmount='';rocketUids.has(id) ? rocketUids.delete(id) : rocketUids.add(id); render(); haptic(); } break;
+    case 'rocket-clear': rocketUids.clear();rocketAmount='';render();break;
     case 'rocket-auto': rocketAuto=!rocketAuto; saveRocketPrefs(); render(); break;
     case 'rocket-preset': rocketAuto=true; rocketAutoTarget=Number(id); saveRocketPrefs(); render(); break;
     case 'mine-start': case 'mine-cell': case 'mine-cash': mineAction(action,id); break;
@@ -717,7 +711,7 @@ document.addEventListener('click', event => {
     case 'select-slot': slotUid = slotUid === id ? null : id; render(); haptic(); break;
     case 'clear-slot': slotUid = null; render(); haptic(); break;
     case 'fast': fastMode = !fastMode; try { localStorage.setItem('brainrot-freebie-fast',fastMode ? 'on' : 'off'); } catch {} button.setAttribute('aria-pressed',String(fastMode)); haptic(); break;
-    case 'open-case': void openCase(id); break;
+    case 'open-case': void openCase(id,Number(button.dataset.count || 1)); break;
     case 'upgrade': void upgrade(); break;
     case 'select-source': sourceUids.has(id) ? sourceUids.delete(id) : sourceUids.add(id); quick = null; render(); haptic(); break;
     case 'clear-source': sourceUids.clear(); quick = null; render(); haptic(); break;
@@ -729,7 +723,7 @@ document.addEventListener('click', event => {
     case 'settings-sound': sound.setEnabled(!sound.enabled);try{localStorage.setItem('brainrot-freebie-sound',sound.enabled ? 'on' : 'off');}catch{}updateSoundButton();settingsDialog();break;
     case 'settings-streamer': streamerMode=!streamerMode;try{localStorage.setItem('brainrot-freebie-streamer',streamerMode ? 'on' : 'off');}catch{}document.body.classList.toggle('streamer-mode',streamerMode);settingsDialog();break;
     case 'copy-nickname': navigator.clipboard.writeText('@BrainrotFreebie').then(()=>toast('Ник скопирован')).catch(()=>openModal('<div class="modal-content"><h2>Скопируй ник</h2><input readonly value="@BrainrotFreebie" aria-label="Ник для копирования"></div>'));break;
-    case 'deposit-chat': {event.preventDefault();const url=button.href;if(tg?.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank','noopener');break;}
+    case 'deposit-bot': {event.preventDefault();const url=button.href;if(tg?.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank','noopener');break;}
     case 'join-channel': {const url=server?.config?.newsUrl || 'https://t.me/brainrotFreebie';if(tg?.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank','noopener');break;}
     case 'quest-claim': void serverAction('quest-claim',{questId:id}).then(r=>{if(r){render();toast('Награда +'+r.result.reward+' BStars');}});break;
     case 'sell-all': sellAllDialog();break;
@@ -765,6 +759,15 @@ document.addEventListener('click', event => {
   }
 });
 document.addEventListener('input', event => {
+  if(event.target.id==='rocket-stake-value' && !busy) {
+    rocketAmount=event.target.value;rocketUids.clear();
+    document.querySelectorAll('.rocket-inventory .item-card.selected').forEach(card=>{card.classList.remove('selected');card.setAttribute('aria-pressed','false');card.querySelector('.selected-check')?.remove();});
+    const amount=Number(rocketAmount),valid=rocketAmount.trim()!==''&&Number.isFinite(amount)&&amount>=.01&&amount<=state.balance&&Math.abs(amount*100-Math.round(amount*100))<1e-7;
+    const button=$('[data-action="rocket-start"]');if(button)button.disabled=!valid||!canSelectRocket()||!!state.gamesPaused;
+    if($('#rocket-stake-total'))$('#rocket-stake-total').textContent=`✦ ${money(valid ? amount : 0)}`;
+    const summary=$('.rocket-inventory .stake-summary span');if(summary)summary.innerHTML=`С баланса<strong>✦ ${money(valid ? amount : 0)}</strong>`;
+    const clear=$('[data-action="rocket-clear"]');if(clear)clear.disabled=!rocketAmount;
+  }
   if (event.target.id === 'target-search' && !busy) { targetSearch = event.target.value; $('#target-grid').innerHTML = targetsMarkup(); }
   if (event.target.id==='rocket-auto-value' && !busy) { const value=Number(event.target.value); if (value>=1.01 && value<=100 && Number.isFinite(value)) { rocketAutoTarget=value; saveRocketPrefs(); } }
 });

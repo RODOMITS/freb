@@ -320,38 +320,38 @@
     {
       "id": "sahur",
       "name": "Сахур кейс",
-      "price": 19,
-      "theme": "Sahur",
+      "price": 23,
+      "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/sahur.png",
       "drops": [
         {
           "itemId": "lagrand",
-          "baseChance": 0.16152166330571685
+          "baseChance": 0.32351336011867954
         },
         {
           "itemId": "bananito",
-          "baseChance": 0.3350078942637091
+          "baseChance": 0.14533546813755804
         },
         {
           "itemId": "esok",
-          "baseChance": 0.07178740591365192
+          "baseChance": 0.03115117174376242
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.29371552637333265
+          "baseChance": 0.42117830082637386
         },
         {
           "itemId": "tictac",
-          "baseChance": 0.1029675101435895
+          "baseChance": 0.05881359133427445
         },
         {
           "itemId": "queenbee",
-          "baseChance": 0.01
+          "baseChance": 0.005720887954100482
         },
         {
           "itemId": "garama",
-          "baseChance": 0.025
+          "baseChance": 0.014287219885251208
         }
       ]
     },
@@ -359,37 +359,41 @@
       "id": "plant",
       "name": "Банановый кейс",
       "price": 49,
-      "theme": "Сад и зайцы",
+      "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/plant.png",
       "drops": [
         {
           "itemId": "esok",
-          "baseChance": 0.21366093064717415
+          "baseChance": 0.4772571487657038
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.09496041362096627
+          "baseChance": 0.004019914923699337
         },
         {
           "itemId": "tictac",
-          "baseChance": 0.44314859689784275
+          "baseChance": 0.018722936310596915
+        },
+        {
+          "itemId": "queenbee",
+          "baseChance": 0.47353815742732175
         },
         {
           "itemId": "boppin",
-          "baseChance": 0.15679953824211093
+          "baseChance": 0.016699891362721472
         },
         {
           "itemId": "globa",
-          "baseChance": 0.060307514708504206
+          "baseChance": 0.006429188985662106
         },
         {
           "itemId": "food",
-          "baseChance": 0.024123005883401685
+          "baseChance": 0.002577675594264843
         },
         {
           "itemId": "bunny",
-          "baseChance": 0.007
+          "baseChance": 0.0007550866300298457
         }
       ]
     },
@@ -397,33 +401,37 @@
       "id": "night",
       "name": "Ночной кейс",
       "price": 99,
-      "theme": "Тёмные брейнроты",
+      "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/night.png",
       "drops": [
         {
           "itemId": "tictac",
-          "baseChance": 0.48274269839401324
+          "baseChance": 0.48414440298107186
         },
         {
           "itemId": "lavadorito",
-          "baseChance": 0.2327509438685421
+          "baseChance": 0.010973105628488721
         },
         {
           "itemId": "eviledon",
-          "baseChance": 0.10344486394157425
+          "baseChance": 0.004882491390439429
+        },
+        {
+          "itemId": "boppin",
+          "baseChance": 0.46974381921825653
         },
         {
           "itemId": "guest666",
-          "baseChance": 0.1141555232970175
+          "baseChance": 0.01906698120606624
         },
         {
           "itemId": "americano",
-          "baseChance": 0.04390597049885289
+          "baseChance": 0.007339608156179324
         },
         {
           "itemId": "casaboo",
-          "baseChance": 0.023
+          "baseChance": 0.003849591419497922
         }
       ]
     },
@@ -431,71 +439,75 @@
       "id": "fastfood",
       "name": "Фастфуд кейс",
       "price": 199,
-      "theme": "Еда и сладости",
+      "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/fastfood.png",
       "drops": [
         {
           "itemId": "lavadorito",
-          "baseChance": 0.4195533068018928
+          "baseChance": 0.4521128669132874
         },
         {
           "itemId": "cash",
-          "baseChance": 0.2022846300651983
+          "baseChance": 0.029376877121391844
         },
         {
           "itemId": "pizza",
-          "baseChance": 0.08990428002897702
+          "baseChance": 0.01306194538728526
         },
         {
           "itemId": "burguro",
-          "baseChance": 0.03746011667874043
+          "baseChance": 0.005448310578035525
+        },
+        {
+          "itemId": "capitano",
+          "baseChance": 0.40928341865273743
         },
         {
           "itemId": "breakfast",
-          "baseChance": 0.16307609241819385
+          "baseChance": 0.05897710895150011
         },
         {
           "itemId": "truckini",
-          "baseChance": 0.06272157400699764
+          "baseChance": 0.022689657289038503
         },
         {
           "itemId": "ketupatbro",
-          "baseChance": 0.025
+          "baseChance": 0.009049815106723967
         }
       ]
     },
     {
       "id": "feast",
       "name": "Праздничный кейс",
-      "price": 399,
-      "theme": "Еда и сладости",
+      "price": 385,
+      "theme": "Средние",
       "hue": 0,
       "image": "img/cases/feast.png",
       "drops": [
         {
           "itemId": "pizza",
-          "baseChance": 0.4535328840391171
+          "baseChance": 0.46787721270655724
         },
         {
           "itemId": "spooky",
-          "baseChance": 0.21866764051886
+          "baseChance": 0.03212278729344276
         },
         {
           "itemId": "cookie",
-          "baseChance": 0.09718561800838221
+          "baseChance": 0.4305232215745477
         },
         {
           "itemId": "rosey",
-          "baseChance": 0.16077667481318497
+          "baseChance": 0.04842609362067551
         },
         {
           "itemId": "cakini",
-          "baseChance": 0.06183718262045576
+          "baseChance": 0.018631574469490576
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.008
+          "baseChance": 0.0024191103352862726
         }
       ]
     },
@@ -503,33 +515,33 @@
       "id": "cash",
       "name": "Денежный кейс",
       "price": 599,
-      "theme": "Братья и комбинации",
+      "theme": "Средние",
       "hue": 0,
       "image": "img/cases/cash.png",
       "drops": [
         {
           "itemId": "capitano",
-          "baseChance": 0.111512451326751
+          "baseChance": 0.22142935562997865
         },
         {
           "itemId": "cerberus",
-          "baseChance": 0.23128508423326136
+          "baseChance": 0.2294046483047235
         },
         {
           "itemId": "bumbatron",
-          "baseChance": 0.04956108947855599
+          "baseChance": 0.049165996065297875
         },
         {
           "itemId": "fortunu",
-          "baseChance": 0.42079654858325616
+          "baseChance": 0.38031900789333
         },
         {
           "itemId": "foxini",
-          "baseChance": 0.16184482637817546
+          "baseChance": 0.10366024746548909
         },
         {
           "itemId": "kalika",
-          "baseChance": 0.025
+          "baseChance": 0.016020744641180907
         }
       ]
     },
@@ -537,33 +549,37 @@
       "id": "ocean",
       "name": "Морской кейс",
       "price": 699,
-      "theme": "Морские брейнроты",
+      "theme": "Средние",
       "hue": 0,
       "image": "img/cases/ocean.png",
       "drops": [
         {
           "itemId": "cerberus",
-          "baseChance": 0.4584227042751636
+          "baseChance": 0.47399891013172074
         },
         {
           "itemId": "pegasus",
-          "baseChance": 0.22102523241838246
+          "baseChance": 0.026001089868279235
+        },
+        {
+          "itemId": "ketupatbro",
+          "baseChance": 0.4308466251397791
         },
         {
           "itemId": "jellymoby",
-          "baseChance": 0.19210884114919505
+          "baseChance": 0.04143007452815429
         },
         {
           "itemId": "kraken",
-          "baseChance": 0.07388801582661347
+          "baseChance": 0.01594079789544395
         },
         {
           "itemId": "digi",
-          "baseChance": 0.02955520633064539
+          "baseChance": 0.006382319158177583
         },
         {
           "itemId": "mobybros",
-          "baseChance": 0.025
+          "baseChance": 0.005400183278445101
         }
       ]
     },
@@ -571,33 +587,37 @@
       "id": "olympus",
       "name": "Олимпус кейс",
       "price": 499,
-      "theme": "Мифы и боссы",
+      "theme": "Средние",
       "hue": 0,
       "image": "img/cases/olympus.png",
       "drops": [
         {
           "itemId": "cerberus",
-          "baseChance": 0.41503788889078547
+          "baseChance": 0.47775616606591265
         },
         {
           "itemId": "pegasus",
-          "baseChance": 0.20010755357234297
+          "baseChance": 0.015395731185137396
         },
         {
           "itemId": "guest666",
-          "baseChance": 0.08893669047659687
+          "baseChance": 0.006848102748949952
+        },
+        {
+          "itemId": "rosey",
+          "baseChance": 0.45366077761125656
         },
         {
           "itemId": "foxini",
-          "baseChance": 0.19566290398797614
+          "baseChance": 0.030629972440396565
         },
         {
           "itemId": "dragon",
-          "baseChance": 0.07525496307229852
+          "baseChance": 0.011786912477075605
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.025
+          "baseChance": 0.003922337471271282
         }
       ]
     },
@@ -605,33 +625,37 @@
       "id": "dragon",
       "name": "Драконий кейс",
       "price": 1999,
-      "theme": "Мифы и боссы",
+      "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/dragon.png",
       "drops": [
         {
           "itemId": "casaboo",
-          "baseChance": 0.3014257316487683
+          "baseChance": 0.4399401267678079
         },
         {
           "itemId": "venuspino",
-          "baseChance": 0.14533026347351327
+          "baseChance": 0.04157606608382534
         },
         {
           "itemId": "dragon",
-          "baseChance": 0.06459122821045032
+          "baseChance": 0.01848380714836681
+        },
+        {
+          "itemId": "kraken",
+          "baseChance": 0.3672973064509573
         },
         {
           "itemId": "digi",
-          "baseChance": 0.33486033870413806
+          "baseChance": 0.09092695621096146
         },
         {
           "itemId": "lasupr",
-          "baseChance": 0.12879243796313003
+          "baseChance": 0.034978060081139024
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.025
+          "baseChance": 0.006797677256942191
         }
       ]
     },
@@ -639,33 +663,37 @@
       "id": "miami",
       "name": "Майами кейс",
       "price": 249,
-      "theme": "Сад и зайцы",
+      "theme": "Средние",
       "hue": 0,
       "image": "img/cases/miami.png",
       "drops": [
         {
           "itemId": "eviledon",
-          "baseChance": 0.4406576817575593
+          "baseChance": 0.4718709169338504
         },
         {
           "itemId": "boppin",
-          "baseChance": 0.09442664609090554
+          "baseChance": 0.008658948635738345
         },
         {
           "itemId": "globa",
-          "baseChance": 0.2124599537045375
+          "baseChance": 0.019470134430411283
+        },
+        {
+          "itemId": "pegasus",
+          "baseChance": 0.44281945146485224
         },
         {
           "itemId": "rosey",
-          "baseChance": 0.1787180188783872
+          "baseChance": 0.040467918223623396
         },
         {
           "itemId": "bunny",
-          "baseChance": 0.06873769956861046
+          "baseChance": 0.015570737778316688
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.005
+          "baseChance": 0.0011418925332076875
         }
       ]
     },
@@ -673,71 +701,75 @@
       "id": "sunset",
       "name": "Закатный кейс",
       "price": 1299,
-      "theme": "Братья и комбинации",
+      "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/sunset.png",
       "drops": [
         {
           "itemId": "rosey",
-          "baseChance": 0.43075677110281674
+          "baseChance": 0.49914138586027357
         },
         {
           "itemId": "fortunu",
-          "baseChance": 0.20768630035314378
+          "baseChance": 0.0005184677675594215
         },
         {
           "itemId": "foxini",
-          "baseChance": 0.09230502237917501
+          "baseChance": 0.00023598567447085398
         },
         {
           "itemId": "venuspino",
-          "baseChance": 0.038460425991322926
+          "baseChance": 0.00010416069769618917
+        },
+        {
+          "itemId": "ginger",
+          "baseChance": 0.4984221263407248
         },
         {
           "itemId": "lasupr",
-          "baseChance": 0.14862718012533557
+          "baseChance": 0.0010068136475201704
         },
         {
           "itemId": "antonio",
-          "baseChance": 0.057164300048205996
+          "baseChance": 0.0003933898644308348
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.025
+          "baseChance": 0.00017767014732425945
         }
       ]
     },
     {
       "id": "burrow",
       "name": "Заячий кейс",
-      "price": 399,
-      "theme": "Сад и зайцы",
+      "price": 340,
+      "theme": "Средние",
       "hue": 0,
       "image": "img/cases/burrow.png",
       "drops": [
         {
           "itemId": "globa",
-          "baseChance": 0.48143334088895606
+          "baseChance": 0.4839497075493767
         },
         {
           "itemId": "cash",
-          "baseChance": 0.23211964650003236
+          "baseChance": 0.016050292450623265
         },
         {
           "itemId": "americano",
-          "baseChance": 0.1031642873333477
+          "baseChance": 0.46842093635926896
         },
         {
           "itemId": "bunny",
-          "baseChance": 0.12659307936720168
+          "baseChance": 0.021800886791875345
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.04868964591046219
+          "baseChance": 0.008391110304567443
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.008
+          "baseChance": 0.0013870665442882674
         }
       ]
     },
@@ -745,33 +777,37 @@
       "id": "combination",
       "name": "Комбинационный кейс",
       "price": 799,
-      "theme": "Братья и комбинации",
+      "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/combination.png",
       "drops": [
         {
           "itemId": "pegasus",
-          "baseChance": 0.38487928572918334
+          "baseChance": 0.46154771942486833
         },
         {
           "itemId": "guest666",
-          "baseChance": 0.1855667984765705
+          "baseChance": 0.0266169634750912
         },
         {
           "itemId": "breakfast",
-          "baseChance": 0.08247413265625356
+          "baseChance": 0.011835317100040531
+        },
+        {
+          "itemId": "foxini",
+          "baseChance": 0.41814273990977235
         },
         {
           "itemId": "ginger",
-          "baseChance": 0.23261317671077236
+          "baseChance": 0.05485070186697925
         },
         {
           "itemId": "kalika",
-          "baseChance": 0.08946660642722015
+          "baseChance": 0.021102577641145873
         },
         {
           "itemId": "lasupr",
-          "baseChance": 0.025
+          "baseChance": 0.00590398058210255
         }
       ]
     },
@@ -779,33 +815,37 @@
       "id": "heroes",
       "name": "Геройский кейс",
       "price": 599,
-      "theme": "Герои",
+      "theme": "Средние",
       "hue": 0,
       "image": "img/cases/heroes.png",
       "drops": [
         {
           "itemId": "capitano",
-          "baseChance": 0.448284926859926
+          "baseChance": 0.46439951124031065
         },
         {
           "itemId": "americano",
-          "baseChance": 0.21613737545032144
+          "baseChance": 0.024642646064400336
         },
         {
           "itemId": "bumbatron",
-          "baseChance": 0.0960610557556984
+          "baseChance": 0.010957842695289032
+        },
+        {
+          "itemId": "fortunu",
+          "baseChance": 0.4282691370372856
         },
         {
           "itemId": "cakini",
-          "baseChance": 0.15926201917459473
+          "baseChance": 0.047686120205237575
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.06125462275945951
+          "baseChance": 0.01834696930970676
         },
         {
           "itemId": "antonio",
-          "baseChance": 0.019
+          "baseChance": 0.005697773447770111
         }
       ]
     },
@@ -813,33 +853,37 @@
       "id": "bosses",
       "name": "Босс кейс",
       "price": 1499,
-      "theme": "Мифы и боссы",
+      "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/bosses.png",
       "drops": [
         {
           "itemId": "rosey",
-          "baseChance": 0.2736513564138844
+          "baseChance": 0.4142342084141544
         },
         {
           "itemId": "bumbatron",
-          "baseChance": 0.13193904684240854
+          "baseChance": 0.05937247109789311
         },
         {
           "itemId": "dragon",
-          "baseChance": 0.05863957637440378
+          "baseChance": 0.026393320487952485
+        },
+        {
+          "itemId": "ginger",
+          "baseChance": 0.30893436183769013
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.36888945915560795
+          "baseChance": 0.13154224436217168
         },
         {
           "itemId": "kraken",
-          "baseChance": 0.14188056121369536
+          "baseChance": 0.05059932475468141
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.025
+          "baseChance": 0.008924069045456763
         }
       ]
     }

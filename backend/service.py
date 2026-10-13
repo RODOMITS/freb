@@ -2,7 +2,6 @@ import copy
 import hashlib
 import json
 import math
-import os
 import re
 import secrets
 import time
@@ -37,7 +36,7 @@ class Service:
         self.deposit_ids=[i for i in self.deposit_ids if i in self.items]
         self.cases = {case['id']:case for case in catalog['cases']}
         for case_id, name, free, hue in [('daily','Бесплатный кейс','daily',0),('subscribe','Кейс за подписку','subscribe',0)]:
-            self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,hue=hue,image='img/cases/daily.png' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
+            self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,theme='Бесплатные',hue=hue,image='img/cases/daily.png' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
         for case_id,name in [('referral','За приглашение'),('nickname','За ник')]:
             self.cases[case_id]=dict(id=case_id,name=name,price=0,free=case_id,theme='Бесплатные',hue=0,image='img/cases/'+case_id+'.png',drops=[dict(itemId=i,baseChance=p) for i,p in [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)]])
         web_root=Path(__file__).resolve().parent.parent
@@ -115,11 +114,11 @@ class Service:
         counts={r['type']:r['count'] for r in db.execute("SELECT type,count(*) count FROM operations WHERE user_id=? AND coalesce(completed,created)>=? AND coalesce(completed,created)<? AND status!='pending' AND type IN ('case','upgrade','slots','mines','rocket') GROUP BY type",(uid,start.timestamp(),end.timestamp()))}
         claimed={r['quest_id'] for r in db.execute('SELECT quest_id FROM quest_claims WHERE user_id=? AND day=?',(uid,day))}
         pool=[
-            ('case',[(3,5,'Открой 3 кейса'),(5,8,'Открой 5 кейсов')]),
-            ('upgrade',[(3,5,'Сделай 3 апгрейда'),(5,10,'Сделай 5 апгрейдов')]),
-            ('slots',[(3,5,'Сыграй 3 раза в слоты'),(5,8,'Сыграй 5 раз в слоты')]),
-            ('mines',[(2,5,'Заверши 2 раунда мин'),(3,8,'Заверши 3 раунда мин')]),
-            ('rocket',[(2,5,'Заверши 2 раунда ракетки'),(3,8,'Заверши 3 раунда ракетки')])
+            ('case',[(3,6,'Открой 3 кейса'),(5,12,'Открой 5 кейсов')]),
+            ('upgrade',[(3,8,'Сделай 3 апгрейда'),(5,15,'Сделай 5 апгрейдов')]),
+            ('slots',[(3,4,'Сыграй 3 раза в слоты'),(5,8,'Сыграй 5 раз в слоты')]),
+            ('mines',[(2,8,'Заверши 2 раунда мин'),(3,14,'Заверши 3 раунда мин')]),
+            ('rocket',[(2,10,'Заверши 2 раунда ракетки'),(3,18,'Заверши 3 раунда ракетки')])
         ]
         items=[]
         for slot in range(2):
@@ -172,8 +171,8 @@ class Service:
         return FairRandom(row['seed'],row['client'],nonce), proof
 
     def stake(self, state, uids):
-        if not isinstance(uids,list) or not 1 <= len(uids) <= 100 or any(not isinstance(u,str) for u in uids) or len(set(uids)) != len(uids):
-            raise ValueError('Выбери от 1 до 100 разных предметов')
+        if not isinstance(uids,list) or not uids or any(not isinstance(u,str) for u in uids) or len(set(uids)) != len(uids):
+            raise ValueError('Выбери хотя бы один доступный предмет')
         entries = [e for e in state['inventory'] if e['uid'] in uids]
         if len(entries) != len(uids):
             raise ValueError('Предмет недоступен или уже поставлен')
@@ -186,15 +185,7 @@ class Service:
         state['balance']+=amount-covered
 
     def check_risk(self, db, maximum):
-        outstanding=0
-        for row in db.execute('SELECT state FROM users'):
-            state=json.loads(row['state'])
-            for kind in ('mines','rocket'):
-                game=state.get(kind)
-                if game and game['status']=='active':
-                    outstanding+=cents(game.get('riskMax',game['stakeValue']*100 if kind=='rocket' else self.limits.max_payout))
-        if outstanding+cents(maximum)>cents(self.limits.max_open_risk):
-            raise ValueError('Лимит активных ставок достигнут. Дождись завершения игр.')
+        return None
 
     def withdraw_hold(self, db, uid):
         pending=db.execute("SELECT max(created) FROM invoices WHERE user_id=? AND status='refund_requested'",(uid,)).fetchone()[0]
@@ -235,7 +226,7 @@ class Service:
             seed, round_id = new_seed(), ident()
             crash = crash_point(FairRandom(seed,round_id,0).draw())
             start = (self.clock()+10)*1000
-            game = dict(id=round_id,rtp=RTP,seed=seed,serverHash=commitment(seed),clientSeed=round_id,startAt=start,endAt=start+math.log(crash)/.24*1000,crash=crash,capped=crash>=100,maxTotalStake=self.limits.rocket_round_stake)
+            game = dict(id=round_id,rtp=RTP,seed=seed,serverHash=commitment(seed),clientSeed=round_id,startAt=start,endAt=start+math.log(crash)/.24*1000,crash=crash,capped=crash>=100)
             db.execute('INSERT INTO rounds VALUES(?,?)',(round_id,json.dumps(game)))
         return game
 
@@ -442,9 +433,12 @@ class Service:
             case=self.cases.get(b.get('caseId'))
             if not case:
                 raise ValueError('Кейс не найден')
+            count=integer(b.get('count',1),1,3)
+            if count not in (1,3) or case.get('free') and count!=1:
+                raise ValueError('Выбери открытие ×1 или ×3 для платного кейса')
             if case.get('free'):
                 previous=db.execute('SELECT claimed FROM claims WHERE user_id=? AND case_id=?',(uid,case['id'])).fetchone()
-                if previous and (case['free']!='daily' or now<previous['claimed']+86400):
+                if previous and (case['free'] not in ('daily','subscribe','nickname') or now<previous['claimed']+86400):
                     raise ValueError('Кейс пока недоступен')
                 if case['free']=='subscribe' and not b.get('_subscribed'):
                     raise ValueError('Подпишись на канал для открытия кейса')
@@ -457,22 +451,22 @@ class Service:
                         raise ValueError('Добавь @BrainrotFreebie в имя Telegram и заново открой приложение')
                 db.execute('INSERT INTO claims VALUES(?,?,?) ON CONFLICT(user_id,case_id) DO UPDATE SET claimed=excluded.claimed',(uid,case['id'],now))
             price=cents(case['price'])
-            maximum=max(self.items[d['itemId']]['value'] for d in case['drops'])
-            self.limits.check_case(case['price'],maximum)
-            self.check_risk(db,maximum)
-            if state['balance'] < price:
+            if state['balance'] < price*count:
                 raise ValueError('Не хватает BStars')
-            rng,proof=self.rng(db,uid,'case')
-            item_id=roll_case(case,self.items,rng)
-            state['balance']-=price
-            item_uid=self.add_item(state,item_id)
-            state['stats']['opened']+=1
+            state['balance']-=price*count
             table=[dict(itemId=d['itemId'],chance=d['chance']) for d in distribution(case,self.items)]
-            self.operation(db,uid,'case',f'Кейс · {case["name"]}',delta=-price,detail=f'Получен {self.items[item_id]["name"]}',proof=dict(proof,caseId=case['id'],outcome=item_id,table=table))
-            if not case.get('free'):
-                self.referral_result(db,uid,item_uid,case['price'],self.items[item_id]['value'])
-            self.drop(db,uid,item_id)
-            return dict(itemId=item_id,uid=item_uid)
+            drops=[]
+            for _ in range(count):
+                rng,proof=self.rng(db,uid,'case')
+                item_id=roll_case(case,self.items,rng)
+                item_uid=self.add_item(state,item_id)
+                state['stats']['opened']+=1
+                self.operation(db,uid,'case',f'Кейс · {case["name"]}',delta=-price,detail=f'Получен {self.items[item_id]["name"]}',proof=dict(proof,caseId=case['id'],outcome=item_id,table=table))
+                if not case.get('free'):
+                    self.referral_result(db,uid,item_uid,case['price'],self.items[item_id]['value'])
+                self.drop(db,uid,item_id)
+                drops.append(dict(itemId=item_id,uid=item_uid))
+            return dict(itemId=drops[0]['itemId'],uid=drops[0]['uid'],drops=drops)
         if action=='sale':
             value,entries=self.stake(state,[b.get('uid')])
             self.credit(state,cents(value))
@@ -503,7 +497,7 @@ class Service:
             if point['win']:
                 state['stats']['wins']+=1
                 self.drop(db,uid,target['id'])
-            self.operation(db,uid,'upgrade','Апгрейд','win' if point['win'] else 'lose',detail=f'Ставка {value} · цель {target["name"]} · шанс {chance:.8f}',proof=dict(proof,chance=chance,outcome=point))
+            self.operation(db,uid,'upgrade','Апгрейд','win' if point['win'] else 'lose',detail=f'Ставка {value} · цель {target["name"]} · шанс {chance:.8f}',proof=dict(proof,chance=chance,geometry='arrow',outcome=point))
             self.referral_result(db,uid,ident(),value,target['value'] if point['win'] else 0)
             return dict(landing=point,wonUid=won_uid,chance=chance)
         elif action=='slots':
@@ -561,12 +555,19 @@ class Service:
             auto=b.get('autoCash')
             if auto is not None and (type(auto) not in (int,float) or not math.isfinite(auto) or not 1.01<=auto<=100 or abs(auto*100-round(auto*100))>1e-8):
                 raise ValueError('Автозабор: ×1,01–×100, до двух знаков')
-            value,entries=self.stake(state,b.get('uids'))
+            amount=b.get('amount')
+            if amount is not None:
+                if type(amount) not in (int,float) or not math.isfinite(amount) or amount<.01 or abs(amount*100-round(amount*100))>1e-7 or b.get('uids'):
+                    raise ValueError('Укажи ставку с баланса от 0,01 BStars, до двух знаков')
+                stake_cents=cents(amount)
+                if stake_cents>state['balance']:
+                    raise ValueError('Не хватает BStars')
+                state['balance']-=stake_cents
+                value,entries=stake_cents/100,[]
+            else:
+                value,entries=self.stake(state,b.get('uids'))
             self.limits.check(value,value*100)
             self.check_risk(db,value*100)
-            total=sum(json.loads(r['state'])['rocket']['stakeValue'] for r in db.execute('SELECT state FROM users') if json.loads(r['state']).get('rocket') and json.loads(r['state'])['rocket'].get('roundId')==round_['id'])
-            if total+value>round_.get('maxTotalStake',self.limits.rocket_round_stake):
-                raise ValueError('Лимит ставок общего раунда достигнут')
             proof=dict(serverHash=round_['serverHash'],clientSeed=round_['id'],nonce=0,game='rocket',rtp=round_.get('rtp',.85),roundId=round_['id'])
             op=self.operation(db,uid,'rocket','Ракетка','pending',detail=f'Ставка {value} · раунд {round_["id"]}',proof=proof)
             state['rocket']=dict(id=op,roundId=round_['id'],startAt=round_['startAt'],endAt=round_['endAt'],crash=round_['crash'],capped=round_['capped'],stakeValue=value,stakeCount=len(entries),autoCash=auto,status='active',payout=0,cashAt=0,automatic=False,riskMax=value*100)
@@ -625,12 +626,10 @@ class Service:
             db.execute('INSERT INTO transfers VALUES(?,?,?,?,?,?)',(request_id,uid,action,'pending',json.dumps(data),now))
             self.operation(db,uid,action,'Заявка на депозит' if action=='deposit' else 'Заявка на вывод','pending',detail=f'Заявка {request_id}',op_id=request_id)
             if action=='deposit':
-                owner_id=int(os.getenv('OWNER_ID','7613236278'))
                 profile=json.loads(load_user(db,uid)[0]['profile'])
                 total=(cents(data['value'])+data.get('bonus',0))/100
-                notice=f"Новый депозит #{request_id[:8]}\nИгрок: {profile.get('first_name','Игрок')} · {uid}\nПредмет: {item['name']}\nНачисление после подтверждения: {total:g} BStars\nНажми «Ответить», чтобы выбрать этот диалог. Подтверждение начисления — в админке."
-                payload=dict(chat_id=owner_id,text=notice,reply_markup=dict(inline_keyboard=[[dict(text='Ответить',callback_data='dep:reply:'+request_id)]]))
-                db.execute('INSERT INTO outbox(id,message,method,payload) VALUES(?,?,?,?)',(request_id,'','sendMessage',json.dumps(payload,ensure_ascii=False)))
+                notice=f"Новый депозит #{request_id[:8]}\nИгрок: {profile.get('first_name','Игрок')} · {uid}\nПредмет: {item['name']}\nНачисление после подтверждения: {total:g} BStars\nИгрок направлен в @BrainrotFreebie_deposit_bot. Подтверждение начисления — в админке."
+                db.execute('INSERT INTO outbox(id,message) VALUES(?,?)',(request_id,notice))
             else:
                 db.execute('INSERT INTO outbox(id,message) VALUES(?,?)',(request_id,f'{action} #{request_id}\nTelegram ID: {uid}\n{json.dumps(data,ensure_ascii=False)}'))
             return dict(requestId=request_id)
@@ -701,8 +700,7 @@ class Service:
                     save_user(db,target,target_state)
                 db.execute('UPDATE transfers SET status=? WHERE id=?',('approved' if approve else 'rejected',transfer['id']))
                 if transfer['kind']=='deposit':
-                    db.execute('DELETE FROM bot_dialogs WHERE request_id=?',(transfer['id'],))
-                    notice=dict(chat_id=target,text=('Депозит #'+transfer['id'][:8]+f' подтверждён. Начислено {delta/100:g} BStars. Диалог закрыт.') if approve else 'Депозит #'+transfer['id'][:8]+' отклонён. Диалог закрыт.')
+                    notice=dict(chat_id=target,text=('Депозит #'+transfer['id'][:8]+f' подтверждён. Начислено {delta/100:g} BStars.') if approve else 'Депозит #'+transfer['id'][:8]+' отклонён.')
                     db.execute('INSERT OR IGNORE INTO outbox(id,message,method,payload) VALUES(?,?,?,?)',('deposit-result-'+transfer['id'],'','sendMessage',json.dumps(notice)))
                 self.operation(db,target,transfer['kind'],'Депозит' if transfer['kind']=='deposit' else 'Вывод','done' if approve else 'lose',delta,f'{"Подтверждено" if approve else "Отклонено"} администратором {uid}',op_id=transfer['id'])
             else:
