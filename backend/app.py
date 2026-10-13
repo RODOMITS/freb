@@ -206,7 +206,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',version='1.4.0',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,rtp=.80,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',version='1.4.1',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,rtp=.80,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')

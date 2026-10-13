@@ -72,20 +72,59 @@ class ReleaseTests(unittest.TestCase):
         p=self.s.state(100)['partner']
         self.assertFalse(p['historyComplete']);self.assertEqual(p['turnover'],0);self.assertEqual(p['earned'],4)
     def test_quest_rewards_and_moscow_reset(self):
-        with self.s.store.tx() as db:
-            for kind in ('case','upgrade'):
-                for n in range(5):self.s.operation(db,200,kind,'Test')
-        key=ident()
-        self.call(200,'quest-claim',dict(questId='cases5'),key)
-        self.call(200,'quest-claim',dict(questId='cases5'),key)
-        self.call(200,'quest-claim',dict(questId='upgrades5'))
-        self.assertEqual(self.s.state(200)['balance'],15)
-        with self.assertRaises(ValueError):self.call(200,'quest-claim',dict(questId='cases5'))
-        with self.assertRaises(ValueError):self.call(300,'quest-claim',dict(questId='cases5',progress=999))
-        self.now=datetime(2026,10,17,21,tzinfo=timezone.utc).timestamp()
         q=self.s.state(200)['quests']
-        self.assertEqual(q['day'],'2026-10-18')
-        self.assertTrue(all(i['progress']==0 and not i['claimed'] for i in q['items']))
+        with self.s.store.tx() as db:
+            for quest in q['items']:
+                for n in range(quest['goal']):self.s.operation(db,200,quest['kind'],'Test')
+        expected=sum(i['reward'] for i in q['items'])
+        key=ident();body=dict(questId=q['items'][0]['id'])
+        self.call(200,'quest-claim',body,key);self.call(200,'quest-claim',body,key)
+        self.call(200,'quest-claim',dict(questId=q['items'][1]['id']))
+        self.assertEqual(self.s.state(200)['balance'],expected)
+        with self.assertRaises(ValueError):self.call(200,'quest-claim',body)
+        with self.assertRaises(ValueError):self.call(300,'quest-claim',dict(body,progress=999))
+        self.now=datetime(2026,10,17,21,tzinfo=timezone.utc).timestamp()
+        next_day=self.s.state(200)['quests']
+        self.assertEqual(next_day['day'],'2026-10-18')
+        self.assertTrue(all(i['progress']==0 and not i['claimed'] for i in next_day['items']))
+        self.assertNotEqual([i['id'] for i in q['items']],[i['id'] for i in next_day['items']])
+
+    def test_quest_rotation_shared_and_stable(self):
+        last=None
+        for n in range(15):
+            self.now=datetime(2026,10,1,12,tzinfo=timezone.utc).timestamp()+n*86400
+            q=self.s.state(200)['quests']
+            self.assertEqual(q,self.s.state(300)['quests'])
+            ids=[i['id'] for i in q['items']]
+            if last:self.assertNotEqual(ids,last)
+            self.assertEqual(len(ids),2)
+            self.assertEqual(len({i['kind'] for i in q['items']}),2)
+            self.assertTrue(all(5<=i['reward']<=10 for i in q['items']))
+            last=ids
+
+    def test_completed_games_count_on_completion_day(self):
+        self.now=datetime(2026,10,17,20,59,tzinfo=timezone.utc).timestamp()
+        next_date=self.now+120
+        self.now=next_date
+        kind=self.s.state(200)['quests']['items'][0]['kind']
+        self.now-=120
+        with self.s.store.tx() as db:op=self.s.operation(db,200,kind,'Started','pending')
+        self.now=next_date
+        with self.s.store.tx() as db:self.s.operation(db,200,kind,'Finished','win',op_id=op)
+        self.assertEqual(self.s.state(200)['quests']['items'][0]['progress'],1)
+
+    def test_legacy_quest_claim_does_not_pay_twice(self):
+        for offset in range(5):
+            self.now=datetime(2026,10,17,13,tzinfo=timezone.utc).timestamp()+offset*86400
+            q=self.s.state(200)['quests']
+            item=next((i for i in q['items'] if i['kind'] in ('case','upgrade')),None)
+            if item:break
+        legacy='cases5' if item['kind']=='case' else 'upgrades5'
+        with self.s.store.tx() as db:db.execute('INSERT INTO quest_claims VALUES(?,?,?,?)',(200,q['day'],legacy,self.now))
+        updated=next(i for i in self.s.state(200)['quests']['items'] if i['id']==item['id'])
+        self.assertTrue(updated['claimed'])
+        with self.assertRaises(ValueError):self.call(200,'quest-claim',dict(questId=item['id']))
+
     def test_sale_all_keeps_locked_items_and_is_atomic(self):
         a,b,c=self.items('67','garama','dragon')
         rid=self.call(200,'withdraw',dict(uids=[c]))['result']['requestId']

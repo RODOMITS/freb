@@ -48,7 +48,9 @@ class Store:
             for name,kind in [('stake','INTEGER'),('payout','INTEGER'),('created','REAL')]:
                 if name not in ledger_columns:
                     db.execute(f'ALTER TABLE referral_ledger ADD COLUMN {name} {kind}')
-            db.execute('PRAGMA user_version=5')
+            if 'completed' not in {r['name'] for r in db.execute('PRAGMA table_info(operations)')}:
+                db.execute('ALTER TABLE operations ADD COLUMN completed REAL')
+            db.execute('PRAGMA user_version=6')
 
     def backup(self, directory):
         from datetime import datetime, timezone
