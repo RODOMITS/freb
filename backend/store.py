@@ -55,7 +55,17 @@ class Store:
             for name,kind in [('method','TEXT'),('payload','TEXT'),('retry_at','REAL NOT NULL DEFAULT 0')]:
                 if name not in outbox_columns:
                     db.execute(f'ALTER TABLE outbox ADD COLUMN {name} {kind}')
-            db.execute('PRAGMA user_version=7')
+            if db.execute('PRAGMA user_version').fetchone()[0]<8:
+                db.execute('DELETE FROM bot_dialogs')
+                db.execute("UPDATE outbox SET sent=1 WHERE sent=0 AND id LIKE 'chat-%'")
+                for row in db.execute('SELECT id,payload FROM outbox WHERE sent=0 AND payload IS NOT NULL').fetchall():
+                    payload=json.loads(row['payload'])
+                    buttons=payload.get('reply_markup',{}).get('inline_keyboard',[])
+                    if any(str(button.get('callback_data','')).startswith('dep:') for line in buttons for button in line):
+                        payload.pop('reply_markup',None)
+                        payload['text']=payload.get('text','').split('\nНажми «Ответить»')[0]+'\nИгрок направлен в @BrainrotFreebie_deposit_bot.'
+                        db.execute('UPDATE outbox SET payload=? WHERE id=?',(json.dumps(payload,ensure_ascii=False),row['id']))
+            db.execute('PRAGMA user_version=8')
 
     def backup(self, directory):
         from datetime import datetime, timezone

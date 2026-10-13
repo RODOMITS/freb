@@ -1,18 +1,11 @@
 import { SETTINGS, ITEM_BY_ID, ITEMS, SLOT_RULES } from './config.js';
 
-// Nominal drop weights are shown in the catalog. To obtain configured EV,
-// blend them with the cheapest outcome. No post-roll swaps or near-miss rigging.
+// Catalog weights are the final probabilities used by both client and server.
 export function distribution(caseConfig) {
-  const nominal = caseConfig.drops.map(d => ({ ...d, value: ITEM_BY_ID[d.itemId].value }));
-  const total = nominal.reduce((s, d) => s + d.baseChance, 0);
-  if (Math.abs(total - 1) > 1e-9) throw new Error('Case chances must total 100%');
-  if (caseConfig.free) return nominal.map(d=>({...d,chance:d.baseChance}));
-  const ev = nominal.reduce((s, d) => s + d.value * d.baseChance, 0);
-  const target = caseConfig.price * SETTINGS.rtp;
-  const cheapest = nominal.reduce((a, b) => a.value < b.value ? a : b);
-  if (target < cheapest.value || target > ev) throw new Error('Недопустимая конфигурация кейса');
-  const scale = (target - cheapest.value) / (ev - cheapest.value);
-  return nominal.map(d => ({ ...d, chance: d.baseChance * scale + (d.itemId === cheapest.itemId ? 1 - scale : 0) }));
+  const drops = caseConfig.drops;
+  const total = drops.reduce((sum, drop) => sum + drop.baseChance, 0);
+  if (Math.abs(total - 1) > 1e-9 || drops.some(drop => drop.baseChance < 0)) throw new Error('Case chances must total 100%');
+  return drops.map(drop => ({...drop, chance:drop.baseChance}));
 }
 export function randomUnit() {
   const n = new Uint32Array(1);
@@ -34,9 +27,19 @@ export function buildUpgradeStake(inventory, selectedUids) {
   if (entries.length !== ids.size || entries.some(entry => !ITEM_BY_ID[entry.itemId])) throw new Error('Selected items are not available');
   return { entries, value: entries.reduce((sum,entry) => sum+ITEM_BY_ID[entry.itemId].value,0), remaining: inventory.filter(entry => !ids.has(entry.uid)) };
 }
-// The liquid's AREA is the success probability. Sample a uniform point in the
-// disk, then test whether the landing point is inside the liquid, not an arc.
+// The filled boundary is calibrated to the arrow's path around the circle.
 export function liquidLevel(chance) {
+  if (!Number.isFinite(chance) || chance < 0 || chance > 1) throw new Error('Invalid probability');
+  return 120 + Math.cos(Math.PI * chance) * 104;
+}
+export function upgradeLanding(chance, radialUnit = randomUnit(), angleUnit = randomUnit()) {
+  if (![radialUnit, angleUnit].every(n => Number.isFinite(n) && n >= 0 && n < 1)) throw new Error('Invalid random unit');
+  const angle = angleUnit * Math.PI * 2;
+  const x = 120 + Math.sin(angle) * 104;
+  const y = 120 - Math.cos(angle) * 104;
+  return {x, y, angle:angleUnit*360, level:liquidLevel(chance), win:chance>0 && y>=liquidLevel(chance)};
+}
+function legacyLiquidLevel(chance) {
   if (!Number.isFinite(chance) || chance < 0 || chance > 1) throw new Error('Invalid probability');
   let low = -1, high = 1;
   for (let i = 0; i < 40; i++) {
@@ -46,13 +49,13 @@ export function liquidLevel(chance) {
   }
   return 120 + (low + high) / 2 * 104;
 }
-export function upgradeLanding(chance, radialUnit = randomUnit(), angleUnit = randomUnit()) {
+export function legacyUpgradeLanding(chance, radialUnit = randomUnit(), angleUnit = randomUnit()) {
   if (![radialUnit, angleUnit].every(n => Number.isFinite(n) && n >= 0 && n < 1)) throw new Error('Invalid random unit');
   const radius = Math.sqrt(radialUnit) * 104;
   const angle = angleUnit * Math.PI * 2;
   const x = 120 + Math.sin(angle) * radius;
   const y = 120 - Math.cos(angle) * radius;
-  return { x, y, angle: angleUnit * 360, win: chance > 0 && y >= liquidLevel(chance) };
+  return { x, y, angle: angleUnit * 360, win: chance > 0 && y >= legacyLiquidLevel(chance) };
 }
 export function slotMultiplier(symbols) {
   if (!Array.isArray(symbols) || symbols.length !== 3 || symbols.some(id => !ITEM_BY_ID[id])) throw new Error('Invalid slot symbols');
@@ -183,15 +186,23 @@ export function rocketFinished(game,now=Date.now()) { return now>=game.startAt+M
 function validRocket(game) {
   return game && typeof game.id==='string' && ['active','won','lost'].includes(game.status) && Number.isFinite(game.startAt) && Number.isFinite(game.crash) && game.crash>=1 && game.crash<=100 && typeof game.capped==='boolean' && Number.isSafeInteger(game.stakeValue) && game.stakeValue>0 && Number.isFinite(game.payout) && game.payout>=0 && (game.autoCash===null || Number.isFinite(game.autoCash)&&game.autoCash>=1.01&&game.autoCash<=100) && Number.isFinite(game.cashAt) && game.cashAt>=0&&game.cashAt<=100;
 }
-export function startRocket(state,selectedUids,autoCash=null,unit=randomUnit(),now=Date.now()) {
+export function startRocket(state,selectedUids,autoCash=null,unit=randomUnit(),now=Date.now(),amount=null) {
   state=advanceRocket(state,now);
   if (state.rocket && !rocketFinished(state.rocket,now)) throw new Error('Дождись завершения полёта.');
   if (autoCash!==null && (!Number.isFinite(autoCash)||autoCash<1.01||autoCash>100||Math.abs(autoCash*100-Math.round(autoCash*100))>1e-8)) throw new Error('Автозабор: от ×1,01 до ×100,00, максимум два знака после запятой.');
-  const stake=buildUpgradeStake(state.inventory,selectedUids);
-  if (!stake.entries.length) throw new Error('Выбери предметы для ставки.');
+  let stake,balance=state.balance;
+  if(amount!==null) {
+    if(!Number.isFinite(amount)||amount<.01||Math.abs(amount*100-Math.round(amount*100))>1e-7||selectedUids.size)throw new Error('Укажи ставку с баланса от 0,01 BStars, до двух знаков.');
+    if(Math.round(amount*100)>Math.round(balance*100))throw new Error('Не хватает BStars.');
+    amount=Math.round(amount*100)/100;balance=Math.round((balance-amount)*100)/100;
+    stake={value:amount,entries:[],remaining:state.inventory};
+  } else {
+    stake=buildUpgradeStake(state.inventory,selectedUids);
+    if(!stake.entries.length)throw new Error('Выбери предметы или укажи ставку с баланса.');
+  }
   const outcome=rocketOutcome(unit);
   const game={id:operationId(),...outcome,startAt:now+ROCKET_RULES.countdownMs,stakeValue:stake.value,stakeCount:stake.entries.length,autoCash,status:'active',payout:0,cashAt:0,automatic:false};
-  return recordOperation({...state,inventory:stake.remaining,rocket:game},{id:game.id,type:'rocket',title:'Ракетка',status:'pending',detail:`Ставка: ${stake.value} BStars · предметов: ${stake.entries.length}${autoCash ? ` · автозабор ×${autoCash}` : ''}`});
+  return recordOperation({...state,balance,inventory:stake.remaining,rocket:game},{id:game.id,type:'rocket',title:'Ракетка',status:'pending',detail:`Ставка: ${stake.value} BStars · ${amount!==null ? 'с баланса' : 'предметов: '+stake.entries.length}${autoCash ? ` · автозабор ×${autoCash}` : ''}`});
 }
 function finishRocket(state,game,status,multiplier,automatic) {
   const payout=status==='won' ? Math.round(game.stakeValue*multiplier*100)/100 : 0;

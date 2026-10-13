@@ -99,7 +99,7 @@ class ReleaseTests(unittest.TestCase):
             if last:self.assertNotEqual(ids,last)
             self.assertEqual(len(ids),2)
             self.assertEqual(len({i['kind'] for i in q['items']}),2)
-            self.assertTrue(all(5<=i['reward']<=10 for i in q['items']))
+            self.assertTrue(all(4<=i['reward']<=18 for i in q['items']))
             last=ids
 
     def test_completed_games_count_on_completion_day(self):

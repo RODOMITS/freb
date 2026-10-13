@@ -17,7 +17,6 @@ from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import validate_init_data
-from .deposit_chat import handle as handle_deposit_chat
 from .service import Service, ident, integer
 from .store import load_user, save_user
 from .risk import Limits
@@ -101,7 +100,7 @@ async def configure_telegram():
     while True:
         try:
             BOT_USERNAME=(await telegram('getMe',{}))['username']
-            await telegram('setWebhook',dict(url=PUBLIC_URL+'/webhook',secret_token=WEBHOOK_SECRET,allowed_updates=['message','pre_checkout_query','callback_query'],drop_pending_updates=False))
+            await telegram('setWebhook',dict(url=PUBLIC_URL+'/webhook',secret_token=WEBHOOK_SECRET,allowed_updates=['message','pre_checkout_query'],drop_pending_updates=False))
             await telegram('setChatMenuButton',dict(menu_button=dict(type='web_app',text='Открыть Freebie',web_app=dict(url=PUBLIC_URL))))
             log.info('Telegram webhook and menu configured')
             return
@@ -207,7 +206,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',version='1.4.1',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,rtp=.80,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',version='1.5.0',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,rtp=.80,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -357,14 +356,6 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
             if ok and row['status']=='pending':
                 db.execute('UPDATE invoices SET status=?,checkout=? WHERE id=?',('processing',query['id'],row['id']))
         await telegram('answerPreCheckoutQuery',dict(pre_checkout_query_id=query['id'],ok=ok,**({} if ok else dict(error_message='Счёт недоступен. Создай новый.'))))
-        return dict(ok=True)
-    relay=handle_deposit_chat(service,update,OWNER_ID)
-    if relay is not None:
-        if update.get('callback_query'):
-            try:
-                await telegram('answerCallbackQuery',dict(callback_query_id=update['callback_query']['id'],text=relay.get('answer') or ''))
-            except HTTPException:
-                pass
         return dict(ok=True)
     message=update.get('message',{})
     payment=message.get('successful_payment')

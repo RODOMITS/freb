@@ -207,3 +207,24 @@ dialog:has(.wallet-modal){width:560px}.wallet-deposit-form{margin:18px 0}.wallet
 @media(max-width:600px){.header-right{gap:5px}.settings-open{width:28px;height:32px}.settings-open svg{width:20px;height:20px}}
 
 @media(max-width:600px){.header .brand>span:last-child{display:block;max-width:75px;line-height:1.1}.header .brand strong{display:block}}
+
+/* Version 1.5: stable selections, batch cases and balance rocket stakes. */
+.upgrade-circle .pointer-orbit .pointer-tip{width:16px;height:20px;left:calc(50% - 8px);top:calc(6.666667% - 18px)}
+.case-counts{display:flex;gap:10px;flex:0 1 auto}
+.case-counts>button{min-height:52px;gap:12px}
+.case-counts>button>strong{font-size:19px;font-variant-numeric:tabular-nums}
+.case-counts>button>span{white-space:nowrap}
+.bulk-results{max-width:680px}
+.case-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:24px 0}
+.case-result{display:flex;flex-direction:column;align-items:center;gap:10px;padding:15px 10px;background:#ffffff05;border:1px solid #ffffff10;border-radius:15px}
+.case-result img{width:100%;height:130px;object-fit:contain}
+.case-result strong{font-size:12px;line-height:1.35;min-height:33px}
+.case-result span{font-size:13px;color:#ffcf76;font-variant-numeric:tabular-nums}
+.rocket-balance-stake{margin:18px 0;padding:16px;border:1px solid #ffffff0e;border-radius:13px;background:#ffffff03}
+.rocket-balance-stake>label{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:700;margin-bottom:11px}
+.rocket-balance-stake label>span{font-size:10px;font-weight:400;color:var(--muted)}
+.rocket-balance-stake>div{display:flex;align-items:center;gap:10px;padding:0 13px;border:1px solid #ffffff13;border-radius:9px;background:#100e1b;color:#ffcf76}
+.rocket-balance-stake input{width:100%;min-width:0;height:43px;border:0;outline:0;background:transparent;color:#f2ddef;font-size:15px;font-variant-numeric:tabular-nums}
+.rocket-balance-stake small{display:block;color:var(--muted);font-size:10px;margin-top:9px}
+.item-grid{overflow-anchor:none}
+@media(max-width:620px){.open-controls{gap:8px}.case-counts{gap:8px;flex:1}.case-counts>button{flex:1;min-width:0;padding:0 10px;gap:7px;font-size:10px}.case-counts>button>strong{font-size:16px}.case-results{gap:7px}.case-result{padding:10px 6px}.case-result img{height:95px}.case-result strong{font-size:10px}.rocket-balance-stake label>span{max-width:45%;text-align:right}}
