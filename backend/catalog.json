@@ -3,315 +3,315 @@
     {
       "id": "67",
       "name": "67",
-      "value": 3,
+      "value": 20,
       "rarity": "common",
       "image": "img/brainrots/67.webp"
     },
     {
       "id": "lagrand",
       "name": "La Grande Combinasione",
-      "value": 7,
+      "value": 10,
       "rarity": "common",
       "image": "img/brainrots/lagrand.webp"
     },
     {
       "id": "bananito",
       "name": "Bananito",
-      "value": 9,
+      "value": 13,
       "rarity": "common",
       "image": "img/brainrots/bananito.webp"
     },
     {
       "id": "esok",
       "name": "Esok Sekolah",
-      "value": 15,
+      "value": 13,
       "rarity": "common",
       "image": "img/brainrots/esok.webp"
     },
     {
       "id": "ketupat",
       "name": "Ketupat Kepat",
-      "value": 25,
+      "value": 21,
       "rarity": "rare",
       "image": "img/brainrots/ketupat.webp"
     },
     {
       "id": "tictac",
       "name": "Tictac Sahur",
-      "value": 42,
+      "value": 23,
       "rarity": "rare",
       "image": "img/brainrots/tictac.webp"
     },
     {
       "id": "queenbee",
       "name": "Queen Bee",
-      "value": 58,
+      "value": 46,
       "rarity": "rare",
       "image": "img/brainrots/Queen_Bee.webp"
     },
     {
       "id": "lavadorito",
       "name": "Lavadorito Spinito",
-      "value": 60,
+      "value": 23,
       "rarity": "rare",
       "image": "img/brainrots/lavadorito.webp"
     },
     {
       "id": "garama",
       "name": "Garama and Madundung",
-      "value": 72,
+      "value": 52,
       "rarity": "rare",
       "image": "img/brainrots/garama.webp"
     },
     {
       "id": "eviledon",
       "name": "Eviledon",
-      "value": 85,
+      "value": 34,
       "rarity": "epic",
       "image": "img/brainrots/eviledon.webp"
     },
     {
       "id": "boppin",
       "name": "Boppin Bunny",
-      "value": 102,
+      "value": 67,
       "rarity": "epic",
       "image": "img/brainrots/Boppin_Bunny.webp"
     },
     {
       "id": "globa",
       "name": "Globa Steppa",
-      "value": 131,
+      "value": 129,
       "rarity": "epic",
       "image": "img/brainrots/Default_Globa_Steppa.webp"
     },
     {
       "id": "cash",
       "name": "Cash or Card",
-      "value": 146,
+      "value": 60,
       "rarity": "epic",
       "image": "img/brainrots/cash.webp"
     },
     {
       "id": "pizza",
       "name": "Pizza and Ranch",
-      "value": 154,
+      "value": 120,
       "rarity": "epic",
       "image": "img/brainrots/pizza.webp"
     },
     {
       "id": "food",
       "name": "La Food Combinasione",
-      "value": 170,
+      "value": 193,
       "rarity": "epic",
       "image": "img/brainrots/La_Food_Combinasion.webp"
     },
     {
       "id": "spooky",
       "name": "Spooky and Pumpky",
-      "value": 170,
+      "value": 167,
       "rarity": "epic",
       "image": "img/brainrots/Spooky_and_Pumpky.webp"
     },
     {
       "id": "burguro",
       "name": "Burguro and Fryuro",
-      "value": 171,
+      "value": 134,
       "rarity": "epic",
       "image": "img/brainrots/burguro.webp"
     },
     {
       "id": "capitano",
       "name": "Capitano Moby",
-      "value": 200,
+      "value": 159,
       "rarity": "epic",
       "image": "img/brainrots/capitano.webp"
     },
     {
       "id": "cerberus",
       "name": "Cerberus",
-      "value": 214,
+      "value": 181,
       "rarity": "legendary",
       "image": "img/brainrots/cerberus.webp"
     },
     {
       "id": "pegasus",
       "name": "Celestial Pegasus",
-      "value": 250,
+      "value": 181,
       "rarity": "legendary",
       "image": "img/brainrots/pegasus.webp"
     },
     {
       "id": "guest666",
       "name": "Guest666",
-      "value": 257,
+      "value": 207,
       "rarity": "legendary",
       "image": "img/brainrots/guest666.webp"
     },
     {
       "id": "americano",
       "name": "Capitano Americano",
-      "value": 340,
+      "value": 336,
       "rarity": "legendary",
       "image": "img/brainrots/Capitano_Americano.webp"
     },
     {
       "id": "breakfast",
       "name": "La Breakfast Combinasione",
-      "value": 382,
+      "value": 368,
       "rarity": "legendary",
       "image": "img/brainrots/La_Breakfast_Combinasion.webp"
     },
     {
       "id": "cookie",
       "name": "Cookie and Milki",
-      "value": 385,
+      "value": 171,
       "rarity": "legendary",
       "image": "img/brainrots/cookie.webp"
     },
     {
       "id": "rosey",
       "name": "Rosey and Teddy",
-      "value": 543,
+      "value": 540,
       "rarity": "legendary",
       "image": "img/brainrots/Rosey_and_Teddy.webp"
     },
     {
       "id": "bumbatron",
       "name": "Bumbatron",
-      "value": 577,
+      "value": 566,
       "rarity": "legendary",
       "image": "img/brainrots/Bumbatron.webp"
     },
     {
       "id": "truckini",
       "name": "Sammyni Truckini",
-      "value": 594,
+      "value": 285,
       "rarity": "legendary",
       "image": "img/brainrots/Sammyni_Truckini.webp"
     },
     {
       "id": "fortunu",
       "name": "Fortunu and Cashuru",
-      "value": 599,
+      "value": 305,
       "rarity": "legendary",
       "image": "img/brainrots/fortunu.webp"
     },
     {
       "id": "casaboo",
       "name": "La Casa Boo",
-      "value": 645,
+      "value": 700,
       "rarity": "legendary",
       "image": "img/brainrots/La_Casa_Boo.webp"
     },
     {
       "id": "ketupatbro",
       "name": "Ketupat Bros",
-      "value": 771,
+      "value": 712,
       "rarity": "secret",
       "image": "img/brainrots/ketupatbro.webp"
     },
     {
       "id": "foxini",
       "name": "Foxini Lanterini",
-      "value": 857,
+      "value": 459,
       "rarity": "secret",
       "image": "img/brainrots/foxini.webp"
     },
     {
       "id": "venuspino",
       "name": "Venuspino",
-      "value": 900,
+      "value": 839,
       "rarity": "secret",
       "image": "img/brainrots/venuspino.webp"
     },
     {
       "id": "bunny",
       "name": "Bunny and Eggy",
-      "value": 934,
+      "value": 922,
       "rarity": "secret",
       "image": "img/brainrots/bunny.webp"
     },
     {
       "id": "dragon",
       "name": "Dragon Cannelloni",
-      "value": 942,
+      "value": 964,
       "rarity": "secret",
       "image": "img/brainrots/dragon.webp"
     },
     {
       "id": "cakini",
       "name": "Sammyni Cakini",
-      "value": 1104,
+      "value": 1300,
       "rarity": "secret",
       "image": "img/brainrots/Sammyni_Cakini.webp"
     },
     {
       "id": "jellymoby",
       "name": "Jelly Moby",
-      "value": 1189,
+      "value": 1594,
       "rarity": "secret",
       "image": "img/brainrots/jellymoby.webp"
     },
     {
       "id": "ginger",
       "name": "Ginger Gerat",
-      "value": 1528,
+      "value": 1594,
       "rarity": "secret",
       "image": "img/brainrots/Ginger_gerat.webp"
     },
     {
       "id": "hydrabunny",
       "name": "Hydra Bunny",
-      "value": 1953,
+      "value": 1846,
       "rarity": "secret",
       "image": "img/brainrots/hydrabunny.webp"
     },
     {
       "id": "kraken",
       "name": "Kraken",
-      "value": 2377,
+      "value": 2433,
       "rarity": "secret",
       "image": "img/brainrots/kraken.webp"
     },
     {
       "id": "kalika",
       "name": "Kalika Bros",
-      "value": 2547,
+      "value": 5035,
       "rarity": "secret",
       "image": "img/brainrots/Kalika_Bros.webp"
     },
     {
       "id": "digi",
       "name": "Digi Narwhal",
-      "value": 2632,
+      "value": 2601,
       "rarity": "secret",
       "image": "img/brainrots/digi.webp"
     },
     {
       "id": "lasupr",
       "name": "La Supreme Combinasione",
-      "value": 2802,
+      "value": 2392,
       "rarity": "secret",
       "image": "img/brainrots/lasupr.webp"
     },
     {
       "id": "mobybros",
       "name": "Moby Bros",
-      "value": 2802,
+      "value": 2851,
       "rarity": "secret",
       "image": "img/brainrots/mobybros.webp"
     },
     {
       "id": "antonio",
       "name": "Antonio",
-      "value": 4670,
+      "value": 5874,
       "rarity": "secret",
       "image": "img/brainrots/Antonio.webp"
     },
     {
       "id": "lovebear",
       "name": "Love Love Bear",
-      "value": 7387,
+      "value": 7510,
       "rarity": "secret",
       "image": "img/brainrots/lovebar.webp"
     }
@@ -320,7 +320,7 @@
     {
       "id": "sahur",
       "name": "Сахур кейс",
-      "price": 19,
+      "price": 17,
       "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/sahur.png",
@@ -358,7 +358,7 @@
     {
       "id": "plant",
       "name": "Банановый кейс",
-      "price": 49,
+      "price": 44,
       "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/plant.png",
@@ -400,7 +400,7 @@
     {
       "id": "night",
       "name": "Ночной кейс",
-      "price": 99,
+      "price": 89,
       "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/night.png",
@@ -438,7 +438,7 @@
     {
       "id": "fastfood",
       "name": "Фастфуд кейс",
-      "price": 199,
+      "price": 179,
       "theme": "Дешёвые",
       "hue": 0,
       "image": "img/cases/fastfood.png",
@@ -480,7 +480,7 @@
     {
       "id": "feast",
       "name": "Праздничный кейс",
-      "price": 399,
+      "price": 359,
       "theme": "Средние",
       "hue": 0,
       "image": "img/cases/feast.png",
@@ -514,7 +514,7 @@
     {
       "id": "cash",
       "name": "Денежный кейс",
-      "price": 599,
+      "price": 539,
       "theme": "Средние",
       "hue": 0,
       "image": "img/cases/cash.png",
@@ -548,7 +548,7 @@
     {
       "id": "ocean",
       "name": "Морской кейс",
-      "price": 699,
+      "price": 669,
       "theme": "Средние",
       "hue": 0,
       "image": "img/cases/ocean.png",
@@ -586,7 +586,7 @@
     {
       "id": "olympus",
       "name": "Олимпус кейс",
-      "price": 499,
+      "price": 459,
       "theme": "Средние",
       "hue": 0,
       "image": "img/cases/olympus.png",
@@ -624,7 +624,7 @@
     {
       "id": "dragon",
       "name": "Драконий кейс",
-      "price": 1999,
+      "price": 2029,
       "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/dragon.png",
@@ -662,7 +662,7 @@
     {
       "id": "miami",
       "name": "Майами кейс",
-      "price": 249,
+      "price": 224,
       "theme": "Средние",
       "hue": 0,
       "image": "img/cases/miami.png",
@@ -700,7 +700,7 @@
     {
       "id": "sunset",
       "name": "Закатный кейс",
-      "price": 1299,
+      "price": 1339,
       "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/sunset.png",
@@ -742,7 +742,7 @@
     {
       "id": "burrow",
       "name": "Заячий кейс",
-      "price": 399,
+      "price": 359,
       "theme": "Средние",
       "hue": 0,
       "image": "img/cases/burrow.png",
@@ -776,7 +776,7 @@
     {
       "id": "combination",
       "name": "Комбинационный кейс",
-      "price": 799,
+      "price": 719,
       "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/combination.png",
@@ -814,7 +814,7 @@
     {
       "id": "heroes",
       "name": "Геройский кейс",
-      "price": 599,
+      "price": 539,
       "theme": "Средние",
       "hue": 0,
       "image": "img/cases/heroes.png",
@@ -852,7 +852,7 @@
     {
       "id": "bosses",
       "name": "Босс кейс",
-      "price": 1499,
+      "price": 1509,
       "theme": "Мощные",
       "hue": 0,
       "image": "img/cases/bosses.png",
