@@ -2,6 +2,7 @@ import copy
 import hashlib
 import json
 import math
+import os
 import re
 import secrets
 import time
@@ -623,7 +624,15 @@ class Service:
             request_id=ident()
             db.execute('INSERT INTO transfers VALUES(?,?,?,?,?,?)',(request_id,uid,action,'pending',json.dumps(data),now))
             self.operation(db,uid,action,'Заявка на депозит' if action=='deposit' else 'Заявка на вывод','pending',detail=f'Заявка {request_id}',op_id=request_id)
-            db.execute('INSERT INTO outbox(id,message) VALUES(?,?)',(request_id,f'{action} #{request_id}\nTelegram ID: {uid}\n{json.dumps(data,ensure_ascii=False)}'))
+            if action=='deposit':
+                owner_id=int(os.getenv('OWNER_ID','7613236278'))
+                profile=json.loads(load_user(db,uid)[0]['profile'])
+                total=(cents(data['value'])+data.get('bonus',0))/100
+                notice=f"Новый депозит #{request_id[:8]}\nИгрок: {profile.get('first_name','Игрок')} · {uid}\nПредмет: {item['name']}\nНачисление после подтверждения: {total:g} BStars\nНажми «Ответить», чтобы выбрать этот диалог. Подтверждение начисления — в админке."
+                payload=dict(chat_id=owner_id,text=notice,reply_markup=dict(inline_keyboard=[[dict(text='Ответить',callback_data='dep:reply:'+request_id)]]))
+                db.execute('INSERT INTO outbox(id,message,method,payload) VALUES(?,?,?,?)',(request_id,'','sendMessage',json.dumps(payload,ensure_ascii=False)))
+            else:
+                db.execute('INSERT INTO outbox(id,message) VALUES(?,?)',(request_id,f'{action} #{request_id}\nTelegram ID: {uid}\n{json.dumps(data,ensure_ascii=False)}'))
             return dict(requestId=request_id)
         elif action.startswith('admin-'):
             if uid not in self.admins:
@@ -691,6 +700,10 @@ class Service:
                 if target!=uid:
                     save_user(db,target,target_state)
                 db.execute('UPDATE transfers SET status=? WHERE id=?',('approved' if approve else 'rejected',transfer['id']))
+                if transfer['kind']=='deposit':
+                    db.execute('DELETE FROM bot_dialogs WHERE request_id=?',(transfer['id'],))
+                    notice=dict(chat_id=target,text=('Депозит #'+transfer['id'][:8]+f' подтверждён. Начислено {delta/100:g} BStars. Диалог закрыт.') if approve else 'Депозит #'+transfer['id'][:8]+' отклонён. Диалог закрыт.')
+                    db.execute('INSERT OR IGNORE INTO outbox(id,message,method,payload) VALUES(?,?,?,?)',('deposit-result-'+transfer['id'],'','sendMessage',json.dumps(notice)))
                 self.operation(db,target,transfer['kind'],'Депозит' if transfer['kind']=='deposit' else 'Вывод','done' if approve else 'lose',delta,f'{"Подтверждено" if approve else "Отклонено"} администратором {uid}',op_id=transfer['id'])
             else:
                 raise ValueError('Операция не найдена')
