@@ -324,7 +324,7 @@ export const CASES = [
   {
     "id": "sahur",
     "name": "Сахур кейс",
-    "price": 23,
+    "price": 19,
     "theme": "Дешёвые",
     "hue": 0,
     "image": "img/cases/sahur.png",
@@ -484,7 +484,7 @@ export const CASES = [
   {
     "id": "feast",
     "name": "Праздничный кейс",
-    "price": 385,
+    "price": 399,
     "theme": "Средние",
     "hue": 0,
     "image": "img/cases/feast.png",
@@ -746,7 +746,7 @@ export const CASES = [
   {
     "id": "burrow",
     "name": "Заячий кейс",
-    "price": 340,
+    "price": 399,
     "theme": "Средние",
     "hue": 0,
     "image": "img/cases/burrow.png",

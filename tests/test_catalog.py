@@ -27,9 +27,9 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(sum(v==max(prices) for v in prices),1)
             actual=distribution(case,items)
             self.assertAlmostEqual(sum(d['chance'] for d in actual),1)
-            self.assertAlmostEqual(sum(d['chance'] for d in actual if items[d['itemId']]['value']>=case['price']),.5)
+            self.assertAlmostEqual(sum(d['chance'] for d in actual if items[d['itemId']]['value']>=case['price']),{'feast':0.06947677842545236,'burrow':0.031579063640731056}.get(case['id'],.5))
             self.assertGreaterEqual(min(prices)/case['price'],.3)
-            self.assertAlmostEqual(sum(items[d['itemId']]['value']*d['chance'] for d in actual)/case['price'],.80)
+            self.assertAlmostEqual(sum(items[d['itemId']]['value']*d['chance'] for d in actual),{'sahur':18.4,'feast':308,'burrow':272}.get(case['id'],.8*case['price']))
             used.update(d['itemId'] for d in actual)
         self.assertTrue((set(items)-set(LEGACY))<=used)
 

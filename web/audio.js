@@ -17,7 +17,7 @@ export class SoundEngine {
         this.context = this.contextFactory();
         if (!this.context) return;
         this.master = this.context.createGain();
-        this.master.gain.value = .22;
+        this.master.gain.value = .45;
         this.master.connect(this.context.destination);
       }
       if (this.context.state === 'suspended') this.context.resume().catch(() => {});
@@ -25,7 +25,7 @@ export class SoundEngine {
   }
   setEnabled(enabled) {
     this.enabled = enabled;
-    if (this.master) this.master.gain.setValueAtTime(enabled ? .22 : 0, this.context.currentTime);
+    if (this.master) this.master.gain.setValueAtTime(enabled ? .45 : 0, this.context.currentTime);
     if (enabled) this.unlock();
   }
   tone(frequency, duration, { offset = 0, volume = .3, type = 'sine', endFrequency = frequency } = {}) {
