@@ -330,12 +330,12 @@ export const CASES = [
     "image": "img/cases/sahur.png",
     "drops": [
       {
-        "itemId": "67",
-        "baseChance": 0.3350078942637091
-      },
-      {
         "itemId": "lagrand",
         "baseChance": 0.16152166330571685
+      },
+      {
+        "itemId": "bananito",
+        "baseChance": 0.3350078942637091
       },
       {
         "itemId": "esok",
@@ -347,7 +347,11 @@ export const CASES = [
       },
       {
         "itemId": "tictac",
-        "baseChance": 0.1129675101435895
+        "baseChance": 0.1029675101435895
+      },
+      {
+        "itemId": "queenbee",
+        "baseChance": 0.01
       },
       {
         "itemId": "garama",
@@ -364,16 +368,16 @@ export const CASES = [
     "image": "img/cases/plant.png",
     "drops": [
       {
-        "itemId": "bananito",
-        "baseChance": 0.44314859689784275
-      },
-      {
         "itemId": "esok",
         "baseChance": 0.21366093064717415
       },
       {
         "itemId": "ketupat",
         "baseChance": 0.09496041362096627
+      },
+      {
+        "itemId": "tictac",
+        "baseChance": 0.44314859689784275
       },
       {
         "itemId": "boppin",
@@ -402,7 +406,7 @@ export const CASES = [
     "image": "img/cases/night.png",
     "drops": [
       {
-        "itemId": "esok",
+        "itemId": "tictac",
         "baseChance": 0.48274269839401324
       },
       {
@@ -436,7 +440,7 @@ export const CASES = [
     "image": "img/cases/fastfood.png",
     "drops": [
       {
-        "itemId": "ketupat",
+        "itemId": "lavadorito",
         "baseChance": 0.4195533068018928
       },
       {
@@ -508,12 +512,12 @@ export const CASES = [
     "image": "img/cases/cash.png",
     "drops": [
       {
-        "itemId": "cash",
-        "baseChance": 0.23128508423326136
-      },
-      {
         "itemId": "capitano",
         "baseChance": 0.111512451326751
+      },
+      {
+        "itemId": "cerberus",
+        "baseChance": 0.23128508423326136
       },
       {
         "itemId": "bumbatron",
@@ -542,11 +546,11 @@ export const CASES = [
     "image": "img/cases/ocean.png",
     "drops": [
       {
-        "itemId": "garama",
+        "itemId": "cerberus",
         "baseChance": 0.4584227042751636
       },
       {
-        "itemId": "capitano",
+        "itemId": "pegasus",
         "baseChance": 0.22102523241838246
       },
       {
@@ -610,7 +614,7 @@ export const CASES = [
     "image": "img/cases/dragon.png",
     "drops": [
       {
-        "itemId": "fortunu",
+        "itemId": "casaboo",
         "baseChance": 0.3014257316487683
       },
       {
@@ -644,16 +648,16 @@ export const CASES = [
     "image": "img/cases/miami.png",
     "drops": [
       {
-        "itemId": "bananito",
+        "itemId": "eviledon",
         "baseChance": 0.4406576817575593
-      },
-      {
-        "itemId": "queenbee",
-        "baseChance": 0.2124599537045375
       },
       {
         "itemId": "boppin",
         "baseChance": 0.09442664609090554
+      },
+      {
+        "itemId": "globa",
+        "baseChance": 0.2124599537045375
       },
       {
         "itemId": "rosey",
@@ -678,7 +682,7 @@ export const CASES = [
     "image": "img/cases/sunset.png",
     "drops": [
       {
-        "itemId": "cash",
+        "itemId": "rosey",
         "baseChance": 0.43075677110281674
       },
       {
@@ -716,11 +720,11 @@ export const CASES = [
     "image": "img/cases/burrow.png",
     "drops": [
       {
-        "itemId": "queenbee",
+        "itemId": "globa",
         "baseChance": 0.48143334088895606
       },
       {
-        "itemId": "boppin",
+        "itemId": "cash",
         "baseChance": 0.23211964650003236
       },
       {
@@ -750,11 +754,11 @@ export const CASES = [
     "image": "img/cases/combination.png",
     "drops": [
       {
-        "itemId": "lagrand",
+        "itemId": "pegasus",
         "baseChance": 0.38487928572918334
       },
       {
-        "itemId": "food",
+        "itemId": "guest666",
         "baseChance": 0.1855667984765705
       },
       {
@@ -784,7 +788,7 @@ export const CASES = [
     "image": "img/cases/heroes.png",
     "drops": [
       {
-        "itemId": "queenbee",
+        "itemId": "capitano",
         "baseChance": 0.448284926859926
       },
       {
@@ -818,11 +822,11 @@ export const CASES = [
     "image": "img/cases/bosses.png",
     "drops": [
       {
-        "itemId": "eviledon",
+        "itemId": "rosey",
         "baseChance": 0.2736513564138844
       },
       {
-        "itemId": "cerberus",
+        "itemId": "bumbatron",
         "baseChance": 0.13193904684240854
       },
       {
