@@ -41,7 +41,7 @@ def landing(chance, rng):
     level = 120 + (low+high)/2*104
     radius, angle = math.sqrt(rng.draw())*104, rng.draw()*math.tau
     x, y = 120 + math.sin(angle)*radius, 120 - math.cos(angle)*radius
-    return dict(x=x, y=y, angle=angle/math.tau*360, win=y >= level)
+    return dict(x=x, y=y, angle=angle/math.tau*360, win=y >= level,level=level)
 
 
 def slots(value, ids, rng, rtp=RTP):

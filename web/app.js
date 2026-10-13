@@ -45,6 +45,9 @@ try { state = validateState(JSON.parse(localStorage.getItem(SETTINGS.storageKey)
 if (server) state=server.state || {...newState(),balance:0,inventory:[]};
 let busy = false, activeRoute = '', sourceUids = new Set(), targetId = null, quick = null, targetSearch = '', toastTimer;
 let displayedChance = 0, gaugeFrame = 0;
+let streamerMode=false;
+try {streamerMode=localStorage.getItem('brainrot-freebie-streamer')==='on';} catch {}
+document.body.classList.toggle('streamer-mode',streamerMode);
 let fastMode = false, slotUid = null;
 let mineUids = new Set(), mineCount = 5, historyFilter = 'all', historyLimit = 20;
 let rocketUids=new Set(), rocketAuto=false, rocketAutoTarget=2, rocketFrame=0, rocketCompletedId=null;
@@ -145,7 +148,7 @@ function renderCase(caseConfig) {
   const claim=state.freeClaims?.[caseConfig.id], unavailable=server && caseConfig.free && claim && (caseConfig.free!=='daily' || server.now()<claim+86400000);
   return `<a class="back" href="#cases">${icon('arrow')}Все кейсы</a><section><div class="case-page-heading"><h1>${caseConfig.name}</h1></div>
     <div class="roulette" aria-label="Рулетка открытия кейса"><div class="roulette-track">${preview.map(i => itemCard(i, { eager:true })).join('')}</div><div class="roulette-selection"></div></div>
-    <div class="open-controls"><button class="primary" data-action="open-case" data-id="${caseConfig.id}" ${state.balance < caseConfig.price || unavailable ? 'disabled' : ''}>${icon('box')}${caseConfig.free ? unavailable ? caseConfig.free!=='daily' ? 'Уже получен' : 'Доступен раз в 24 часа' : 'Открыть бесплатно' : `Открыть за <span class="coin">✦</span>${money(caseConfig.price)}`}</button>${fastButton()}</div>
+    <div class="open-controls"><button class="primary" data-action="open-case" data-id="${caseConfig.id}" ${state.balance < caseConfig.price || unavailable ? 'disabled' : ''}>${icon('box')}${caseConfig.free ? unavailable ? caseConfig.free!=='daily' ? 'Уже получен' : 'Доступен раз в 24 часа' : 'Открыть бесплатно' : `Открыть за <span class="coin">✦</span>${money(caseConfig.price)}`}</button>${fastButton()}</div>${caseBonusHint(caseConfig)}
     ${state.balance < caseConfig.price ? '<div class="demo-banner" style="margin:-16px 0 24px;text-align:center">Не хватает BStars. <button data-action="topup" style="color:var(--pink)">Пополнить баланс →</button></div>' : ''}
     <div class="contents-heading"><h2>Что внутри кейса</h2><button class="info-link" data-action="case-odds" data-id="${caseConfig.id}">Базовые шансы ⓘ</button></div><div class="item-grid">${caseConfig.drops.map(d => itemCard(ITEM_BY_ID[d.itemId], { chance: d.baseChance })).join('')}</div>
     </section>`;
@@ -181,7 +184,7 @@ function gauge(chance) {
     <path class="glass-highlight" d="M39 77a92 92 0 0 1 119-41" fill="none" stroke="#ffffff" stroke-opacity=".1" stroke-width="1.5"/>
     <line id="landing-trail" x1="120" y1="120" x2="120" y2="120" stroke="#fff" stroke-width=".8" stroke-dasharray="2 3" opacity="0"/>
     <circle id="landing-ripple" cx="120" cy="120" r="3" fill="none" stroke="#fff" stroke-width="1.5" opacity="0"/>
-    <path id="landing-dot" d="M0 0L-5 -12L5 -12Z" fill="#fff" stroke="#171020" stroke-width=".5" opacity="0"/>
+    <circle id="landing-ring" cx="0" cy="0" r="7" fill="none" stroke="#fff" stroke-width="1.2" opacity="0"/><circle id="landing-dot" cx="0" cy="0" r="2.5" fill="#fff" stroke="#171020" stroke-width=".5" opacity="0"/>
     </svg><div class="gauge-copy"><strong>${percent(chance)}</strong><small>шанс успеха</small></div><div class="pointer-orbit"><svg class="pointer-tip" viewBox="0 0 16 20" aria-hidden="true"><path d="M1 1h14L8 18Z" fill="#ff9bce" stroke="#ffb5dc" stroke-width="1"/></svg></div></div>`;
 }
 function animateGauge(chance) {
@@ -221,9 +224,9 @@ function renderProfile() {
   const totalValue = state.inventory.reduce((sum, i) => sum + ITEM_BY_ID[i.itemId].value, 0);
   const photo = telegramUser?.photo_url;
   const safePhoto = photo && /^https:\/\//i.test(photo) ? photo : null;
-  return `<div class="profile-head compact-head"><h1>Профиль</h1><a class="admin-link" href="#admin">${icon('shield')}Админ-панель</a></div><section class="profile-card"><div class="avatar">${safePhoto ? `<img src="${esc(safePhoto)}" alt="Аватар пользователя" referrerpolicy="no-referrer">` : esc(playerName.replace('@','').slice(0,2).toUpperCase())}</div><div class="profile-identity"><h2>${esc(playerName)}</h2></div><div class="profile-stats"><div><strong>${money(state.stats.opened)}</strong><small>Кейсов открыто</small></div><div><strong>${money(state.stats.upgrades)}</strong><small>Апгрейдов</small></div><div><strong>${money(state.stats.wins)}</strong><small>Успешных</small></div></div></section>
+  return `<div class="profile-head compact-head"><h1>Профиль</h1><button class="admin-link" data-action="settings">Настройки</button><a class="admin-link" href="#admin">${icon('shield')}Админ-панель</a></div><section class="profile-card"><div class="avatar">${safePhoto ? `<img src="${esc(safePhoto)}" alt="Аватар пользователя" referrerpolicy="no-referrer">` : esc(playerName.replace('@','').slice(0,2).toUpperCase())}</div><div class="profile-identity"><h2>${esc(playerName)}</h2></div><div class="profile-stats"><div><strong>${money(state.stats.opened)}</strong><small>Кейсов открыто</small></div><div><strong>${money(state.stats.upgrades)}</strong><small>Апгрейдов</small></div><div><strong>${money(state.stats.wins)}</strong><small>Успешных</small></div></div></section>
     <section class="promo-panel">${icon('gift')}<div class="promo-copy"><strong>Промокод</strong></div><form class="promo-form" id="promo-form"><input name="promo" autocomplete="off" aria-label="Промокод" placeholder="Промокод" maxlength="30" required><button class="primary">Активировать</button></form></section>
-    <section><div class="inventory-heading"><h2>Инвентарь <span>${state.inventory.length+(state.pendingInventory || []).length}</span></h2><div class="wallet-actions"><button class="primary" data-action="topup">${icon('plus')}Пополнить</button><button class="secondary" data-action="withdraw">${icon('withdraw')}Вывод</button></div></div><div class="inventory-meta"><span>Нажми на брейнрота, чтобы продать</span><span>Стоимость: ✦ ${money(totalValue)}</span></div>${state.inventory.length ? `<div class="item-grid inventory-grid">${state.inventory.map(i => itemCard(ITEM_BY_ID[i.itemId], { action: 'sell', id: i.uid, sale: true })).join('')}</div>` : inventoryEmpty()}
+    <section><div class="inventory-heading"><h2>Инвентарь <span>${state.inventory.length+(state.pendingInventory || []).length}</span></h2><div class="wallet-actions"><button class="secondary" data-action="sell-all" ${!state.inventory.length ? 'disabled' : ''}>Продать всё</button><button class="primary" data-action="topup">${icon('plus')}Пополнить</button><button class="secondary" data-action="withdraw">${icon('withdraw')}Вывод</button></div></div><div class="inventory-meta"><span>Нажми на брейнрота, чтобы продать</span><span>Стоимость: ✦ ${money(totalValue)}</span></div>${state.inventory.length ? `<div class="item-grid inventory-grid">${state.inventory.map(i => itemCard(ITEM_BY_ID[i.itemId], { action: 'sell', id: i.uid, sale: true })).join('')}</div>` : inventoryEmpty()}
     ${pendingInventoryMarkup()}${partnerMarkup()}${!storageWorks ? '<p class="storage-error">Браузер запретил локальное сохранение. После перезагрузки прогресс может сброситься.</p>' : ''}</section>${renderHistory(state,historyFilter,historyLimit,featureUI)}`;
 }
 function pendingInventoryMarkup() {
@@ -231,9 +234,29 @@ function pendingInventoryMarkup() {
   return `${pending.length ? `<div class="item-grid inventory-grid pending-inventory">${pending.map(e=>`<div class="pending-item">${itemCard(ITEM_BY_ID[e.itemId],{action:'locked-item',id:e.uid}).replace('<button ','<button disabled ')}<span>На выводе</span><button class="secondary" data-action="withdraw-cancel" data-id="${e.requestId}">Снять с вывода</button></div>`).join('')}</div>` : ''}<p class="withdraw-schedule">Вывод предметов: суббота, 16:00–17:00 МСК. Отмена заявки доступна в любое время.</p>`;
 }
 function partnerMarkup() {
-  if(!server || !state.partner) return '';
+  if(!server || !state.partner)return '';
   const p=state.partner, link=server.config.botUsername ? `https://t.me/${server.config.botUsername}?start=ref_${p.code}` : '';
-  return `<section class="partner-panel"><div class="selection-title"><h2>Приглашай друзей</h2><strong>40% Rev Share</strong></div><p>Комиссия от чистого проигрыша приглашённых с учётом их выигрышей и подтверждённых депозитов.</p><div class="partner-stats"><span>Приглашено<b>${p.count}</b></span><span>Доступно<b>✦ ${money(p.available)}</b></span><span>Забрано / в заявках<b>✦ ${money(p.claimed)}</b></span></div><form id="partner-code-form" class="promo-form"><input name="code" value="${esc(p.code)}" minlength="4" maxlength="24" required aria-label="Реферальный код"><button class="secondary">Сохранить код</button></form>${link ? `<input class="referral-link" readonly value="${esc(link)}" aria-label="Реферальная ссылка"><button class="secondary" data-action="copy-referral">Копировать ссылку</button>` : '<p>Ссылка появится после настройки имени бота на сервере.</p>'}<div class="game-actions"><button class="primary" data-action="partner-claim" ${p.available<=0 ? 'disabled' : ''}>Забрать на баланс</button><button class="secondary" data-action="partner-withdraw" ${p.available<=0 ? 'disabled' : ''}>Вывести комиссию</button></div><small>Заявка на выплату комиссии — в любой день. Проверки платежей сохраняются.</small>${(state.transfers || []).filter(t=>t.kind==='partner-withdraw' && t.status==='pending' && (!t.userId || t.userId===state.profile.id)).map(t=>`<p>Комиссия на выводе: ${money(t.data.value)} <button class="info-link" data-action="withdraw-cancel" data-id="${t.id}">Отменить</button></p>`).join('')}</section>`;
+  const metrics=[['Приглашено',p.count],['С депозитом',p.depositors || 0],['Пополнения',`✦ ${money(p.deposits || 0)}`],['Доступно',`✦ ${money(p.available)}`],['Всего начислено',`✦ ${money(p.earned)}`],['На игровой баланс',`✦ ${money(p.claimedOnBalance || 0)}`],['На выводе',`✦ ${money(p.pending || 0)}`],['Выведено',`✦ ${money(p.withdrawn || 0)}`],['Ставки рефералов',`✦ ${money(p.turnover || 0)}`],['Выигрыши рефералов',`✦ ${money(p.payouts || 0)}`],['Игр после депозита',p.games || 0],['Перенос выигрышей',`✦ ${money(p.negativeCarry || 0)}`]];
+  return `<section class="partner-panel"><div class="selection-title"><h2>Приглашай друзей</h2><strong>${p.revShare || 40}% RevShare</strong></div><p>40% → 25 человек: 45% → 50: 50% → 100: 55%. Комиссия по текущему уровню от суммарного чистого проигрыша с учётом выигрышей и подтверждённых депозитов. Оборот и игры учитываются после пополнения.</p>${p.nextTier ? `<div class="partner-tier">До ${p.nextTier.rate}% осталось ${Math.max(0,p.nextTier.count-p.count)} человек<progress value="${p.count}" max="${p.nextTier.count}"></progress></div>` : '<div class="partner-tier">Максимальный уровень — 55%</div>'}<div class="partner-stats">${metrics.map(([label,value])=>`<span>${label}<b>${value}</b></span>`).join('')}</div>${p.historyComplete===false ? '<p>Подробный оборот учитывается с версии 1.4.0. Историческая комиссия сохранена.</p>' : ''}<form id="partner-code-form" class="promo-form"><input name="code" value="${esc(p.code)}" minlength="4" maxlength="24" required aria-label="Реферальный код"><button class="secondary">Сохранить код</button></form>${link ? `<input class="referral-link" readonly value="${esc(link)}" aria-label="Реферальная ссылка"><button class="secondary" data-action="copy-referral">Копировать ссылку</button>` : '<p>Ссылка появится после настройки имени бота.</p>'}<div class="game-actions"><button class="primary" data-action="partner-claim" ${p.available<=0 ? 'disabled' : ''}>Забрать на баланс</button><button class="secondary" data-action="partner-withdraw" ${p.available<=0 ? 'disabled' : ''}>Вывести комиссию</button></div><details class="referral-details"><summary>Приглашённые · ${p.count}</summary>${(p.referrals || []).map(r=>`<div class="referral-person"><strong>${esc(r.name)}</strong><small>Пополнено ✦ ${money(r.deposits)} · игр ${r.games}<br>Чистый результат: ${r.netResult>=0 ? 'проигрыш' : 'выигрыш'} ✦ ${money(Math.abs(r.netResult))}</small></div>`).join('') || '<p>Пока никто не приглашён</p>'}</details><small>Комиссию можно вывести в любой день. Проверки платежей сохраняются.</small>${(state.transfers || []).filter(t=>t.kind==='partner-withdraw' && t.status==='pending' && (!t.userId || t.userId===state.profile.id)).map(t=>`<p>Комиссия на выводе: ${money(t.data.value)} <button class="info-link" data-action="withdraw-cancel" data-id="${t.id}">Отменить</button></p>`).join('')}</section>`;
+}
+function renderQuests() {
+  const q=state.quests;
+  if(!server || !q)return '<section class="empty-state"><h1>Квесты</h1><p>Ежедневные квесты доступны в Telegram.</p></section>';
+  return `<div class="compact-head"><h1>Квесты</h1><span>Каждый день</span></div><p class="quest-reset">Обновление в 00:00 МСК</p><div class="quests-grid">${q.items.map(i=>`<section class="quest-card"><div class="quest-icon">${icon(i.id==='cases5' ? 'box' : 'upgrade')}</div><h2>${esc(i.title)}</h2><strong class="quest-reward">✦ ${money(i.reward)} BStars</strong><progress value="${i.progress}" max="${i.goal}"></progress><div class="quest-progress">${i.progress} / ${i.goal}</div><button class="${i.claimed ? 'secondary' : 'primary'}" data-action="quest-claim" data-id="${i.id}" ${i.claimed || i.progress<i.goal ? 'disabled' : ''}>${i.claimed ? 'Награда получена' : i.progress>=i.goal ? 'Забрать награду' : 'Выполни задание'}</button></section>`).join('')}</div>`;
+}
+function settingsDialog() {
+  openModal(`<div class="modal-content settings-modal"><h2>Настройки</h2><div class="settings-row"><div><strong>Звук</strong><p>Нажатия и игровые эффекты</p></div><button class="secondary" data-action="settings-sound" aria-pressed="${sound.enabled}">${sound.enabled ? 'Включён' : 'Выключен'}</button></div><div class="settings-row"><div><strong>Режим стримера</strong><p>Размывает пополнение, вывод, баланс и личные данные</p></div><button class="secondary" data-action="settings-streamer" aria-pressed="${streamerMode}">${streamerMode ? 'Включён' : 'Выключен'}</button></div><p class="settings-version">Brainrot Freebie · версия ${esc(server?.config?.version || '1.4.0')}</p></div>`);
+}
+function subscriptionPrompt() {
+  openModal('<div class="modal-content"><h2>Кейс за подписку</h2><p>Подпишись на канал, затем вернись и снова нажми «Открыть».</p><div class="modal-actions"><button class="primary" data-action="join-channel">Открыть канал</button><button class="secondary" data-action="close-modal">Я подписался</button></div></div>');
+}
+function caseBonusHint(c) {
+  return c.free==='nickname' ? '<p class="case-bonus-hint">Добавь в имя Telegram <button class="info-link" data-action="copy-nickname">@BrainrotFreebie ⧉</button>, затем открой приложение заново.</p>' : '';
+}
+function sellAllDialog() {
+  if(!state.inventory.length)return toast('Нет доступных предметов');
+  const value=state.inventory.reduce((sum,e)=>sum+ITEM_BY_ID[e.itemId].value,0);
+  openModal(`<div class="modal-content wallet-modal"><h2>Продать всё?</h2><p>Доступных предметов: ${state.inventory.length}. На выводе остаются заблокированы.</p><div class="result-value">✦ ${money(value)} BStars</div><div class="modal-actions"><button class="primary" data-action="confirm-sell-all" data-id="${state.inventoryHash || ''}">Продать</button><button class="secondary" data-action="close-modal">Отмена</button></div></div>`);
 }
 document.addEventListener('click',event=>{const a=event.target.closest('[data-theme]');if(a){event.preventDefault();document.getElementById(a.dataset.theme)?.scrollIntoView({behavior:'smooth',block:'start'});}});
 
@@ -259,7 +282,7 @@ function renderSlots() {
 }
 function parseRoute() {
   const hash = location.hash.slice(1);
-  return ['rocket','mines','admin','slots','upgrade','profile','cases'].includes(hash) || (hash.startsWith('case/') && CASE_BY_ID[hash.slice(5)]) ? hash : 'cases';
+  return ['rocket','mines','admin','slots','upgrade','profile','cases','quests'].includes(hash) || (hash.startsWith('case/') && CASE_BY_ID[hash.slice(5)]) ? hash : 'cases';
 }
 function render({ scroll = false } = {}) {
   if (server?.locked) { $('#main').innerHTML=`<section class="empty-state"><h1>${server.maintenance ? 'Бот на обновлении' : 'Brainrot Freebie'}</h1><p>${esc(server.message)}</p>${server.maintenance ? '<p>Снова открой приложение немного позже.</p>' : ''}</section>`; $('#balance').textContent='0'; $('.bottom-nav').hidden=true; $('.balance').disabled=true; return; }
@@ -270,7 +293,7 @@ function render({ scroll = false } = {}) {
   rocketUids=new Set([...rocketUids].filter(uid=>state.inventory.some(entry=>entry.uid===uid)));
   if (state.mines?.status==='active') mineCount=state.mines.bombCount;
   const rocketState=server ? {...state,rocket:sharedRocket(state)} : state;
-  $('#main').innerHTML = route.startsWith('case/') ? renderCase(CASE_BY_ID[route.slice(5)]) : route === 'upgrade' ? renderUpgrade() : route === 'slots' ? renderSlots() : route==='rocket' ? renderRocket(rocketState,rocketUids,rocketAuto,rocketAutoTarget,{...featureUI,server:!!server,now:server?.now}) : route==='mines' ? renderMines(state,mineUids,mineCount,featureUI) : route==='admin' ? server && !state.isAdmin ? '<div class="empty-state">Доступ запрещён</div>' : renderAdmin(state,playerName,{...featureUI,server:!!server}) : route === 'profile' ? renderProfile() : renderCases();
+  $('#main').innerHTML = route.startsWith('case/') ? renderCase(CASE_BY_ID[route.slice(5)]) : route === 'upgrade' ? renderUpgrade() : route==='quests' ? renderQuests() : route === 'slots' ? renderSlots() : route==='rocket' ? renderRocket(rocketState,rocketUids,rocketAuto,rocketAutoTarget,{...featureUI,server:!!server,now:server?.now}) : route==='mines' ? renderMines(state,mineUids,mineCount,featureUI) : route==='admin' ? server && !state.isAdmin ? '<div class="empty-state">Доступ запрещён</div>' : renderAdmin(state,playerName,{...featureUI,server:!!server}) : route === 'profile' ? renderProfile() : renderCases();
   if (server && route==='profile') enhanceServerProfile();
   if(server) {
     if(state.gamesPaused) $('#main').insertAdjacentHTML('afterbegin','<p class="service-notice">Приём новых ставок приостановлен. Активные игры можно завершить.</p>');
@@ -373,12 +396,13 @@ function quickTarget(p) {
 async function upgrade() {
   if (busy) return;
   const fast = fastMode || reducedMotion.matches;
-  const source = getSource(), target = getTarget(), chance = upgradeChance(source,target);
+  const source = getSource(), target = getTarget(); let chance = upgradeChance(source,target);
   if (!chance) return toast('Выбери исходный и желаемый предмет.');
   const stake = buildUpgradeStake(state.inventory, sourceUids); if (!stake.entries.length) return;
   const response=server ? await serverAction('upgrade',{uids:[...sourceUids],targetId:target.id}) : null;
   if (server && !response) return;
   const landing = server ? response.result.landing : upgradeLanding(chance); const win = landing.win;
+  if(server && Number.isFinite(response.result.chance)) chance=response.result.chance;
   if (!server) state.inventory = stake.remaining;
   const wonUid = server ? response.result.wonUid : win ? addInventory(target.id) : null;
   if (!server) {
@@ -399,20 +423,24 @@ async function upgrade() {
   pointer.style.opacity='0';
   $('.liquid-wave').style.visibility='hidden';
   cancelAnimationFrame(gaugeFrame);
-  const exactLevel=liquidLevel(chance); $('#liquid-body').setAttribute('y',exactLevel); $('#water-mask').setAttribute('y',exactLevel); $('#liquid-surface').setAttribute('transform',`translate(0 ${exactLevel})`);
-  const dot = $('#landing-dot'), trail = $('#landing-trail'), ripple = $('#landing-ripple');
-  dot.setAttribute('opacity', '1'); trail.setAttribute('opacity', '.5');
+  const exactLevel=Number.isFinite(landing.level) ? landing.level : liquidLevel(chance); $('#liquid-body').setAttribute('y',exactLevel); $('#water-mask').setAttribute('y',exactLevel); $('#liquid-surface').setAttribute('transform',`translate(0 ${exactLevel})`);
+  const dot = $('#landing-dot'), ring=$('#landing-ring'), trail = $('#landing-trail'), ripple = $('#landing-ripple');
+  dot.setAttribute('opacity', '1'); ring.setAttribute('opacity','1'); trail.setAttribute('opacity', '.5');
+  $('.gauge-copy strong').textContent=percent(chance);
+  $('.upgrade-hint').textContent='Результат определяется по центру метки.';
   trail.setAttribute('x1', startX); trail.setAttribute('y1', startY);
   await new Promise(resolve => {
     const start = performance.now();
     function frame(now) {
       const t = reducedMotion.matches ? 1 : Math.max(0, Math.min((now-start)/(fast ? 100 : 650),1)), eased = 1-(1-t)**3;
       const x = startX + (landing.x-startX)*eased, y = startY + (landing.y-startY)*eased;
-      dot.setAttribute('transform',`translate(${x} ${y})`); trail.setAttribute('x2',x); trail.setAttribute('y2',y);
+      dot.setAttribute('transform',`translate(${x} ${y})`); ring.setAttribute('transform',`translate(${x} ${y})`); trail.setAttribute('x2',x); trail.setAttribute('y2',y);
       if (t < 1) requestAnimationFrame(frame); else resolve();
     }
     requestAnimationFrame(frame);
   });
+  dot.setAttribute('transform',`translate(${landing.x} ${landing.y})`);ring.setAttribute('transform',`translate(${landing.x} ${landing.y})`);
+  $('.upgrade-hint').textContent=win ? 'Центр метки в заполненной области — выигрыш.' : 'Центр метки вне заполненной области — проигрыш.';
   ripple.setAttribute('cx',landing.x); ripple.setAttribute('cy',landing.y); ripple.setAttribute('opacity','1');
   $('.upgrade-circle').classList.add(win ? 'won' : 'lost'); notifyHaptic(win);
   sound.play(win ? 'win' : 'lose');
@@ -541,7 +569,7 @@ async function serverAction(action,body) {
   if (!server || server.locked || serverRequestPending || busy) return null;
   serverRequestPending=true; setBusy(true);
   try { const response=await server.mutate(action,body); adoptServerState(response.state); return response; }
-  catch(error) {toast(error.message); return null;}
+  catch(error) {if(action==='case' && body.caseId==='subscribe' && error.message.includes('Подпишись'))subscriptionPrompt();else toast(error.message); return null;}
   finally {serverRequestPending=false; setBusy(false);}
 }
 function canSelectRocket() { return server ? state.round && !state.round.ended && server.now()<state.round.startAt && state.rocket?.roundId!==state.round.id : !state.rocket || rocketFinished(state.rocket); }
@@ -567,7 +595,7 @@ function runServerRocket() {
 }
 function walletCard(item,options) { return itemCard(item,options).replace('<button ','<button type="button" '); }
 function depositDialog() {
-  openModal(`<div class="modal-content wallet-modal"><h2>Пополнение</h2>${state.referrerCode ? `<p>Код ${esc(state.referrerCode)} закреплён · +15% к пополнениям</p>` : '<form id="referral-bind-form" class="promo-form"><input name="referralCode" placeholder="Код человека" aria-label="Реферальный код для пополнения" required maxlength="24"><button class="secondary">Применить</button></form><p>Укажи код человека и получай +15% к пополнениям. Первое закрепление постоянное.</p>'}<p>Выбери брейнрота для депозита</p><form id="deposit-form" class="wallet-deposit-form"><input type="hidden" name="itemId" value=""><div class="item-grid wallet-item-grid" aria-label="Брейнроты для депозита">${ITEMS.filter(i=>i.value>=ITEM_BY_ID.garama.value && i.id!=='eviledon').map(i=>walletCard(i,{action:'select-deposit',id:i.id,selected:false})).join('')}</div><div class="wallet-selection"><span id="deposit-summary">Предмет не выбран</span><button class="primary" id="deposit-submit" disabled>Создать заявку</button></div></form><p>Передай предмет владельцу в игре. BStars начислятся после подтверждения.</p><form id="stars-form" class="admin-form wallet-stars"><label>Telegram Stars<input name="stars" type="number" min="1" max="10000" step="1" required value="100"></label><p>1 Star = 1,5 BStars<br>После оплаты Stars вывод предметов ограничен на ${money(server.config.starsHoldHours/24)} дней. Игры и продажа внутри сайта доступны.</p>${server.config.paymentsEnabled ? `<label class="purchase-consent"><input type="checkbox" name="terms" required>Принимаю <a href="${esc(server.config.termsUrl)}" target="_blank" rel="noopener">условия покупки</a> и срок ограничения вывода</label><button class="primary">Оплатить звёздами</button>` : '<p>Оплата звёздами ещё не включена.</p>'}</form></div>`);
+  openModal(`<div class="modal-content wallet-modal"><h2>Пополнение</h2>${state.referrerCode ? `<p>Код ${esc(state.referrerCode)} закреплён · +15% к пополнениям</p>` : '<form id="referral-bind-form" class="promo-form"><input name="referralCode" placeholder="Код человека" aria-label="Реферальный код для пополнения" required maxlength="24"><button class="secondary">Применить</button></form><p>Укажи код человека и получай +15% к пополнениям. Первое закрепление постоянное.</p>'}<p>Выбери брейнрота для депозита</p><form id="deposit-form" class="wallet-deposit-form"><input type="hidden" name="itemId" value=""><div class="item-grid wallet-item-grid" aria-label="Брейнроты для депозита">${ITEMS.filter(i=>(server.config.depositIds || []).includes(i.id)).map(i=>walletCard(i,{action:'select-deposit',id:i.id,selected:false})).join('')}</div><div class="wallet-selection"><span id="deposit-summary">Предмет не выбран</span><button class="primary" id="deposit-submit" disabled>Создать заявку</button></div></form><p>Передай предмет владельцу в игре. BStars начислятся после подтверждения.</p><form id="stars-form" class="admin-form wallet-stars"><label>Telegram Stars<input name="stars" type="number" min="1" max="10000" step="1" required value="100"></label><p>1 Star = 1,5 BStars<br>После оплаты Stars вывод предметов ограничен на ${money(server.config.starsHoldHours/24)} дней. Игры и продажа внутри сайта доступны.</p>${server.config.paymentsEnabled ? `<label class="purchase-consent"><input type="checkbox" name="terms" required>Принимаю <a href="${esc(server.config.termsUrl)}" target="_blank" rel="noopener">условия покупки</a> и срок ограничения вывода</label><button class="primary">Оплатить звёздами</button>` : '<p>Оплата звёздами ещё не включена.</p>'}</form></div>`);
 }
 let withdrawUids=new Set();
 function withdrawalDialog() {
@@ -583,13 +611,13 @@ function ownerContact(requestId) {
   openModal(`<div class="modal-content"><h2>Заявка создана</h2><p>Номер: ${esc(requestId)}. Отправь его владельцу.</p><a class="primary" href="${esc(server.config.ownerUrl)}" target="_blank" rel="noopener">Открыть личные сообщения</a></div>`);
 }
 function enhanceServerProfile() {
-  if (!state.isAdmin) $('.admin-link')?.remove();
+  if (!state.isAdmin) $('a.admin-link')?.remove();
   $('.storage-error')?.remove();
   if(state.debt || state.refundReviewPending || state.withdrawHeldUntil>server.now()) $('.profile-card').insertAdjacentHTML('afterend',`<p class="service-notice">${state.debt ? `Задолженность после возврата Stars: ${money(state.debt)} BStars. Обратись в поддержку.` : state.refundReviewPending ? 'Возврат Stars уточняется, вывод временно ограничен.' : `Вывод доступен с ${new Date(state.withdrawHeldUntil).toLocaleString('ru-RU')}.`}</p>`);
   $('.profile-card').insertAdjacentHTML('afterend',`<section class="history-panel"><details><summary>Проверка честности</summary><p class="proof-text">Server hash: ${esc(state.fair.serverHash)}<br>Client seed: ${esc(state.fair.clientSeed)}<br>Nonce: ${state.fair.nonce}</p><form id="fair-form" class="admin-form"><label>Новый client seed<input name="clientSeed" required maxlength="80" value="${esc(state.fair.clientSeed)}"></label><button class="secondary">Раскрыть старый seed и сменить</button></form></details></section><section class="history-panel"><h2>Заявки</h2>${state.transfers.filter(t=>!t.userId || t.userId===state.profile.id).map(t=>`<p class="proof-text">${t.kind==='deposit' ? 'Депозит' : 'Вывод'} · ${esc(t.id)} · ${{pending:'Ожидает',approved:'Подтверждена',rejected:'Отклонена'}[t.status] || esc(t.status)}</p>`).join('') || '<p class="proof-text">Заявок пока нет</p>'}</section>`);
 }
 function enhanceFinancialAdmin() {
-  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel" data-admin-section="money"><div class="selection-title"><h2>Контроль операций</h2></div><section style="margin:18px 0;padding:18px;border:1px solid #ffffff20;border-radius:16px"><h3>${state.maintenance ? 'Приложение закрыто на обновление' : 'Приложение открыто'}</h3><p>Во время обновления доступ есть только у администраторов. Перед закрытием приостанови ставки и дождись окончания активных игр.</p><button class="primary" data-action="admin-maintenance">${state.maintenance ? 'Открыть приложение' : 'Закрыть на обновление'}</button></section><p class="proof-text">Максимальная выплата: ${money(state.limits.max_payout)} BStars<br>Лимит активного риска: ${money(state.limits.max_open_risk)} BStars</p><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
+  $('#main').insertAdjacentHTML('beforeend',`<section class="history-panel" data-admin-section="money"><div class="selection-title"><h2>Контроль операций</h2></div><section style="margin:18px 0;padding:18px;border:1px solid #ffffff20;border-radius:16px"><h3>${state.maintenance ? 'Приложение закрыто на обновление' : 'Приложение открыто'}</h3><p>Во время обновления доступ есть только у администраторов. Статус сохранён в базе и переживает перезапуск. Перед закрытием приостанови ставки и дождись окончания активных игр.</p><button class="primary" data-action="admin-maintenance">${state.maintenance ? 'Открыть приложение' : 'Закрыть на обновление'}</button></section><p class="proof-text">Максимальная выплата: ${money(state.limits.max_payout)} BStars<br>Лимит активного риска: ${money(state.limits.max_open_risk)} BStars</p><div class="game-actions"><button class="secondary" data-action="admin-pause">${state.gamesPaused ? 'Возобновить ставки' : 'Приостановить новые ставки'}</button><button class="secondary" data-action="admin-backup">Скачать резервную копию</button></div><h2 style="margin-top:25px">Платежи Stars</h2>${(state.payments || []).map(p=>`<div class="admin-promo"><div><strong>${p.userId} · ${p.stars} Stars</strong><small>${esc(p.id)}<br>${{pending:'Счёт создан',processing:'Оплата начата',paid:'Оплачен',refund_requested:'Возврат уточняется',refunded:'Возвращён'}[p.status] || esc(p.status)}</small></div>${p.status==='paid' ? `<button class="secondary danger" data-action="refund-preview" data-id="${p.id}">Возврат</button>` : ''}</div>`).join('') || '<p class="proof-text">Платежей пока нет</p>'}</section>`);
 }
 async function downloadBackup() {
   try {const blob=await server.download('/api/admin/backup'), url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='freebie-backup.sqlite3';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);} catch(error){toast(error.message);}
@@ -610,7 +638,7 @@ async function pollServer() {
         if(before.rocket?.status==='active' && state.rocket?.status!=='active' && state.rocket?.id===before.rocket.id) rocketResult();
         const financialChanged=JSON.stringify([before.inventory,before.balance,before.gamesPaused,before.debt,before.withdrawHeldUntil,before.refundReviewPending,before.pendingInventory,before.partner,before.withdrawalOpen])!==JSON.stringify([state.inventory,state.balance,state.gamesPaused,state.debt,state.withdrawHeldUntil,state.refundReviewPending,state.pendingInventory,state.partner,state.withdrawalOpen]);
         const flightChanged=JSON.stringify([before.round?.id,before.round?.ended,before.rocket?.status,before.mines])!==JSON.stringify([state.round?.id,state.round?.ended,state.rocket?.status,state.mines]);
-        const changed=financialChanged || activeRoute==='cases' && JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
+        const changed=financialChanged || activeRoute==='quests' && JSON.stringify(before.quests)!==JSON.stringify(state.quests) || activeRoute==='cases' && JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
         const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday,before.maintenance])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday,state.maintenance]);
         if((changed || adminChanged) && !$('#modal').open) {
           const values=[...document.querySelectorAll('#main input')].filter(i=>i.name && i.form?.id).map(i=>({form:i.form.id,name:i.name,value:i.value}));
@@ -694,6 +722,14 @@ document.addEventListener('click', event => {
     case 'quick': quickTarget(id); break;
     case 'sell': sellDialog(id); break;
     case 'confirm-sell': sell(id); break;
+    case 'settings': settingsDialog(); break;
+    case 'settings-sound': sound.setEnabled(!sound.enabled);try{localStorage.setItem('brainrot-freebie-sound',sound.enabled ? 'on' : 'off');}catch{}updateSoundButton();settingsDialog();break;
+    case 'settings-streamer': streamerMode=!streamerMode;try{localStorage.setItem('brainrot-freebie-streamer',streamerMode ? 'on' : 'off');}catch{}document.body.classList.toggle('streamer-mode',streamerMode);settingsDialog();break;
+    case 'copy-nickname': navigator.clipboard.writeText('@BrainrotFreebie').then(()=>toast('Ник скопирован')).catch(()=>openModal('<div class="modal-content"><h2>Скопируй ник</h2><input readonly value="@BrainrotFreebie" aria-label="Ник для копирования"></div>'));break;
+    case 'join-channel': {const url=server?.config?.newsUrl || 'https://t.me/brainrotFreebie';if(tg?.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank','noopener');break;}
+    case 'quest-claim': void serverAction('quest-claim',{questId:id}).then(r=>{if(r){render();toast('Награда +'+r.result.reward+' BStars');}});break;
+    case 'sell-all': sellAllDialog();break;
+    case 'confirm-sell-all': if(server)void serverAction('sale-all',{inventoryHash:id}).then(r=>{if(r){closeModal();render();toast('Продано '+r.result.count+' предметов');}});else {const value=state.inventory.reduce((sum,e)=>sum+ITEM_BY_ID[e.itemId].value,0);state.inventory=[];state.balance+=value;persist();closeModal();render();}break;
     case 'admin-maintenance': void serverAction('admin-maintenance',{enabled:!state.maintenance}).then(r=>{if(r)render();});break;
     case 'admin-tab': document.querySelectorAll('[data-admin-section]').forEach(s=>s.hidden=id!=='all' && s.dataset.adminSection!==id);document.querySelectorAll('[data-action=admin-tab]').forEach(b=>b.classList.toggle('active',b.dataset.id===id));break;
     case 'admin-user': $('#admin-balance-form').elements.namedItem('userId').value=id;toast('Пользователь выбран');break;
@@ -704,7 +740,7 @@ document.addEventListener('click', event => {
     case 'topup': topup(); break;
     case 'withdraw': if(server) withdrawalDialog(); else openModal('<div class="modal-content"><div class="modal-status-icon">↗</div><h2>Вывод</h2><p>Вывод пока недоступен.</p><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button></div></div>'); break;
     case 'select-deposit': {
-      if(!ITEM_BY_ID[id] || ITEM_BY_ID[id].value<ITEM_BY_ID.garama.value || id==='eviledon') break;
+      if(!ITEM_BY_ID[id] || !(server.config.depositIds || []).includes(id)) break;
       document.querySelectorAll('[data-action="select-deposit"]').forEach(card=>{const selected=card.dataset.id===id;card.classList.toggle('selected',selected);card.setAttribute('aria-pressed',String(selected));card.querySelector('.selected-check')?.remove();if(selected)card.insertAdjacentHTML('afterbegin','<span class="selected-check">✓</span>');});
       $('#deposit-form').elements.namedItem('itemId').value=id;$('#deposit-summary').textContent=`${ITEM_BY_ID[id].name} · ✦ ${money(Math.round(ITEM_BY_ID[id].value*(state.referrerCode ? 1.15 : 1)*100)/100)}${state.referrerCode ? ' (+15%)' : ''}`;$('#deposit-submit').disabled=false;break;
     }
