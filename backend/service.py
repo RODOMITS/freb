@@ -110,10 +110,23 @@ class Service:
     def quests(self, db, uid):
         now=datetime.fromtimestamp(self.clock(),timezone(timedelta(hours=3)))
         start=now.replace(hour=0,minute=0,second=0,microsecond=0)
-        end=start+timedelta(days=1);day=start.strftime('%Y-%m-%d')
-        counts={r['type']:r['count'] for r in db.execute("SELECT type,count(*) count FROM operations WHERE user_id=? AND created>=? AND created<? AND status!='pending' AND type IN ('case','upgrade') GROUP BY type",(uid,start.timestamp(),end.timestamp()))}
+        end=start+timedelta(days=1);day=start.strftime('%Y-%m-%d');day_index=start.date().toordinal()
+        counts={r['type']:r['count'] for r in db.execute("SELECT type,count(*) count FROM operations WHERE user_id=? AND coalesce(completed,created)>=? AND coalesce(completed,created)<? AND status!='pending' AND type IN ('case','upgrade','slots','mines','rocket') GROUP BY type",(uid,start.timestamp(),end.timestamp()))}
         claimed={r['quest_id'] for r in db.execute('SELECT quest_id FROM quest_claims WHERE user_id=? AND day=?',(uid,day))}
-        items=[dict(id=id,title=title,goal=5,progress=min(5,counts.get(kind,0)),reward=reward,claimed=id in claimed) for id,title,kind,reward in [('cases5','Открой 5 кейсов','case',5),('upgrades5','Сделай 5 апгрейдов','upgrade',10)]]
+        pool=[
+            ('case',[(3,5,'Открой 3 кейса'),(5,8,'Открой 5 кейсов')]),
+            ('upgrade',[(3,5,'Сделай 3 апгрейда'),(5,10,'Сделай 5 апгрейдов')]),
+            ('slots',[(3,5,'Сыграй 3 раза в слоты'),(5,8,'Сыграй 5 раз в слоты')]),
+            ('mines',[(2,5,'Заверши 2 раунда мин'),(3,8,'Заверши 3 раунда мин')]),
+            ('rocket',[(2,5,'Заверши 2 раунда ракетки'),(3,8,'Заверши 3 раунда ракетки')])
+        ]
+        items=[]
+        for slot in range(2):
+            kind,variants=pool[(day_index+slot*2)%len(pool)]
+            goal,reward,title=variants[(day_index//5+slot)%len(variants)]
+            quest_id=kind+str(goal)
+            legacy={'case':'cases5','upgrade':'upgrades5'}.get(kind)
+            items.append(dict(id=quest_id,kind=kind,title=title,goal=goal,progress=min(goal,counts.get(kind,0)),reward=reward,claimed=quest_id in claimed or legacy in claimed))
         return dict(day=day,nextResetAt=end.timestamp()*1000,items=items)
 
     def bind_referral(self, db, uid, code):
@@ -145,7 +158,9 @@ class Service:
 
     def operation(self, db, uid, kind, title, status='done', delta=0, detail='', proof=None, op_id=None):
         op_id = op_id or ident()
-        db.execute('INSERT INTO operations VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,delta=excluded.delta,detail=excluded.detail', (op_id,uid,kind,status,delta,title,detail,self.clock(),json.dumps(proof) if proof else None))
+        now=self.clock()
+        completed=now if status!='pending' else None
+        db.execute('INSERT INTO operations(id,user_id,type,status,delta,title,detail,created,proof,completed) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,delta=excluded.delta,detail=excluded.detail,completed=excluded.completed', (op_id,uid,kind,status,delta,title,detail,now,json.dumps(proof) if proof else None,completed))
         return op_id
 
     def rng(self, db, uid, kind):
