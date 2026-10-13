@@ -32,6 +32,8 @@ class Service:
         self.starting_balance = cents(starting_balance)
         catalog = json.loads(Path(__file__).with_name('catalog.json').read_text(encoding='utf-8'))
         self.items = {item['id']:item for item in catalog['items']}
+        self.deposit_ids=["garama","cash","burguro","capitano","mobybros","cerberus","pegasus","boppin","globa","fortunu","rosey","casaboo","hydrabunny","kraken","jellymoby","cakini","bunny","dragon","antonio","lovebear"].copy()
+        self.deposit_ids=[i for i in self.deposit_ids if i in self.items]
         self.cases = {case['id']:case for case in catalog['cases']}
         for case_id, name, free, hue in [('daily','Бесплатный кейс','daily',0),('subscribe','Кейс за подписку','subscribe',0)]:
             self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,hue=hue,image='img/cases/daily.png' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
@@ -71,7 +73,7 @@ class Service:
     def referral_result(self, db, uid, event_id, stake, payout):
         funded=db.execute("SELECT 1 FROM invoices WHERE user_id=? AND status='paid' UNION ALL SELECT 1 FROM transfers WHERE user_id=? AND kind='deposit' AND status='approved' LIMIT 1",(uid,uid)).fetchone()
         if funded and db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone():
-            db.execute('INSERT OR IGNORE INTO referral_ledger VALUES(?,?,?)',(event_id,uid,cents(stake)-cents(payout)))
+            db.execute('INSERT OR IGNORE INTO referral_ledger(event_id,invitee,net,stake,payout,created) VALUES(?,?,?,?,?,?)',(event_id,uid,cents(stake)-cents(payout),cents(stake),cents(payout),self.clock()))
 
     def partner(self, db, uid):
         account=db.execute('SELECT * FROM partners WHERE user_id=?',(uid,)).fetchone()
@@ -80,20 +82,42 @@ class Service:
             db.execute('INSERT INTO partners(user_id,code) VALUES(?,?)',(uid,code))
             db.execute('INSERT OR IGNORE INTO referral_codes VALUES(?,?)',(code,uid))
             account=db.execute('SELECT * FROM partners WHERE user_id=?',(uid,)).fetchone()
-        people=db.execute('SELECT invitee FROM referrals WHERE inviter=?',(uid,)).fetchall()
-        net=0
+        people=db.execute('SELECT r.invitee,r.created,u.profile FROM referrals r JOIN users u ON u.id=r.invitee WHERE r.inviter=? ORDER BY r.created DESC',(uid,)).fetchall()
+        paid={r['user_id']:dict(amount=r['amount'],count=r['count']) for r in db.execute("SELECT user_id,sum(stars)*150 amount,count(*) count FROM invoices WHERE status='paid' AND user_id IN (SELECT invitee FROM referrals WHERE inviter=?) GROUP BY user_id",(uid,))}
+        for r in db.execute("SELECT user_id,data FROM transfers WHERE kind='deposit' AND status='approved' AND user_id IN (SELECT invitee FROM referrals WHERE inviter=?)",(uid,)):
+            entry=paid.setdefault(r['user_id'],dict(amount=0,count=0))
+            entry['amount']+=cents(json.loads(r['data'])['value']);entry['count']+=1
+        ledger={r['invitee']:r for r in db.execute('SELECT invitee,sum(net) net,sum(stake) stake,sum(payout) payout,count(*) count,sum(CASE WHEN stake IS NULL THEN 1 ELSE 0 END) unknown,max(created) last FROM referral_ledger WHERE invitee IN (SELECT invitee FROM referrals WHERE inviter=?) GROUP BY invitee',(uid,))}
+        net=deposits=deposit_count=turnover=payouts=games=unknown=depositors=0
+        details=[]
         for person in people:
-            who=person['invitee']
-            paid=db.execute("SELECT coalesce(sum(stars),0)*150 FROM invoices WHERE user_id=? AND status='paid'",(who,)).fetchone()[0]
-            paid+=sum(cents(json.loads(r['data'])['value']) for r in db.execute("SELECT data FROM transfers WHERE user_id=? AND kind='deposit' AND status='approved'",(who,)))
-            loss=db.execute('SELECT coalesce(sum(net),0) FROM referral_ledger WHERE invitee=?',(who,)).fetchone()[0]
-            # Carry wins forward and cap eligible losses by confirmed funding.
-            net+=min(loss,paid)
-        earned=max(0,net)*40//100
+            who=person['invitee'];funding=paid.get(who,dict(amount=0,count=0));row=ledger.get(who)
+            loss=(row['net'] or 0) if row else 0
+            net+=min(loss,funding['amount']);deposits+=funding['amount'];deposit_count+=funding['count'];depositors+=int(funding['amount']>0)
+            turnover+=(row['stake'] or 0) if row else 0;payouts+=(row['payout'] or 0) if row else 0;games+=row['count'] if row else 0;unknown+=row['unknown'] if row else 0
+            profile=json.loads(person['profile'])
+            details.append(dict(name=('@'+profile['username']) if profile.get('username') else profile.get('first_name','Игрок'),registeredAt=person['created']*1000,deposits=funding['amount']/100,netResult=loss/100,turnover=((row['stake'] or 0)/100) if row else 0,games=row['count'] if row else 0))
+        count=len(people)
+        rate=55 if count>=100 else 50 if count>=50 else 45 if count>=25 else 40
+        earned=max(0,net)*rate//100
         available=max(0,earned-account['claimed'])
-        return dict(code=account['code'],count=len(people),earned=earned/100,claimed=account['claimed']/100,available=available/100,availableCents=available)
+        requests=db.execute("SELECT status,data FROM transfers WHERE user_id=? AND kind='partner-withdraw' AND status IN ('pending','approved')",(uid,)).fetchall()
+        pending=sum(cents(json.loads(r['data'])['value']) for r in requests if r['status']=='pending')
+        withdrawn=sum(cents(json.loads(r['data'])['value']) for r in requests if r['status']=='approved')
+        next_tier=next((dict(count=c,rate=r) for c,r in [(25,45),(50,50),(100,55)] if c>count),None)
+        return dict(code=account['code'],count=count,revShare=rate,nextTier=next_tier,earned=earned/100,claimed=account['claimed']/100,available=available/100,availableCents=available,deposits=deposits/100,depositCount=deposit_count,depositors=depositors,turnover=turnover/100,payouts=payouts/100,games=games,historyComplete=unknown==0,netRevenue=net/100,negativeCarry=max(0,-net)/100,pending=pending/100,withdrawn=withdrawn/100,claimedOnBalance=max(0,account['claimed']-pending-withdrawn)/100,referrals=details[:100])
+
+    def quests(self, db, uid):
+        now=datetime.fromtimestamp(self.clock(),timezone(timedelta(hours=3)))
+        start=now.replace(hour=0,minute=0,second=0,microsecond=0)
+        end=start+timedelta(days=1);day=start.strftime('%Y-%m-%d')
+        counts={r['type']:r['count'] for r in db.execute("SELECT type,count(*) count FROM operations WHERE user_id=? AND created>=? AND created<? AND status!='pending' AND type IN ('case','upgrade') GROUP BY type",(uid,start.timestamp(),end.timestamp()))}
+        claimed={r['quest_id'] for r in db.execute('SELECT quest_id FROM quest_claims WHERE user_id=? AND day=?',(uid,day))}
+        items=[dict(id=id,title=title,goal=5,progress=min(5,counts.get(kind,0)),reward=reward,claimed=id in claimed) for id,title,kind,reward in [('cases5','Открой 5 кейсов','case',5),('upgrades5','Сделай 5 апгрейдов','upgrade',10)]]
+        return dict(day=day,nextResetAt=end.timestamp()*1000,items=items)
 
     def bind_referral(self, db, uid, code):
+
         code=str(code or '').strip().lower()
         if not code: return
         parent=db.execute('SELECT user_id FROM referral_codes WHERE code=?',(code,)).fetchone()
@@ -243,6 +267,8 @@ class Service:
         row, state = load_user(db,uid)
         result = copy.deepcopy(state)
         result['balance'] /= 100
+        result['quests']=self.quests(db,uid)
+        result['inventoryHash']=hashlib.sha256(','.join(sorted(e['uid'] for e in state['inventory'])).encode()).hexdigest()
         result['partner']=self.partner(db,uid)
         parent=db.execute('SELECT p.code FROM referrals r JOIN partners p ON p.user_id=r.inviter WHERE r.invitee=?',(uid,)).fetchone()
         result['referrerCode']=parent['code'] if parent else None
@@ -345,6 +371,15 @@ class Service:
             control=db.execute("SELECT value FROM controls WHERE name='paused'").fetchone()
             if control and control['value']:
                 raise ValueError('Приём новых ставок временно приостановлен. Активные игры продолжаются.')
+        if action=='quest-claim':
+            quests=self.quests(db,uid)
+            quest=next((q for q in quests['items'] if q['id']==b.get('questId')),None)
+            if not quest or quest['claimed'] or quest['progress']<quest['goal']:
+                raise ValueError('Квест ещё не выполнен или награда уже получена')
+            db.execute('INSERT INTO quest_claims VALUES(?,?,?,?)',(uid,quests['day'],quest['id'],now))
+            reward=cents(quest['reward']);self.credit(state,reward)
+            self.operation(db,uid,'quest','Награда за квест',delta=reward,detail=quest['title'])
+            return dict(reward=quest['reward'])
         if action=='referral-bind':
             if not str(b.get('code','')).strip(): raise ValueError('Введи реферальный код')
             self.bind_referral(db,uid,b.get('code'))
@@ -426,6 +461,17 @@ class Service:
             value,entries=self.stake(state,[b.get('uid')])
             self.credit(state,cents(value))
             self.operation(db,uid,'sale','Продажа предмета',delta=cents(value),detail=self.items[entries[0]['itemId']]['name'])
+        elif action=='sale-all':
+            current_hash=hashlib.sha256(','.join(sorted(e['uid'] for e in state['inventory'])).encode()).hexdigest()
+            if b.get('inventoryHash')!=current_hash:
+                raise ValueError('Инвентарь изменился. Проверь предметы и повтори продажу.')
+            if not state['inventory']:
+                raise ValueError('Нет доступных предметов для продажи')
+            count=len(state['inventory']);value=sum(self.items[e['itemId']]['value'] for e in state['inventory'])
+            state['inventory']=[]
+            self.credit(state,cents(value))
+            self.operation(db,uid,'sale','Продажа всех предметов',delta=cents(value),detail=f'{count} предметов')
+            return dict(count=count,value=value)
         elif action=='upgrade':
             target=self.items.get(b.get('targetId'))
             value,entries=self.stake(state,b.get('uids'))
@@ -443,7 +489,7 @@ class Service:
                 self.drop(db,uid,target['id'])
             self.operation(db,uid,'upgrade','Апгрейд','win' if point['win'] else 'lose',detail=f'Ставка {value} · цель {target["name"]} · шанс {chance:.8f}',proof=dict(proof,chance=chance,outcome=point))
             self.referral_result(db,uid,ident(),value,target['value'] if point['win'] else 0)
-            return dict(landing=point,wonUid=won_uid)
+            return dict(landing=point,wonUid=won_uid,chance=chance)
         elif action=='slots':
             value,_=self.stake(state,[b.get('uid')])
             self.limits.check(value,value*5)
@@ -540,8 +586,8 @@ class Service:
                 raise ValueError('Не более пяти незавершённых заявок')
             if action=='deposit':
                 item=self.items.get(b.get('itemId'))
-                if not item or item['value']<self.items['garama']['value'] or item['id']=='eviledon':
-                    raise ValueError('Депозит от Garama, Eviledon не принимается')
+                if not item or item['id'] not in self.deposit_ids:
+                    raise ValueError('Этот брейнрот не принимается для депозита')
                 self.bind_referral(db,uid,b.get('referralCode'))
                 data=dict(itemId=item['id'],value=item['value'],bonus=self.topup_bonus(db,uid,cents(item['value'])))
             else:

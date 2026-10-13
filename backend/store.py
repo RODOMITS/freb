@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS partners(user_id INTEGER PRIMARY KEY, code TEXT UNIQU
 CREATE TABLE IF NOT EXISTS referral_codes(code TEXT PRIMARY KEY, user_id INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS referrals(invitee INTEGER PRIMARY KEY, inviter INTEGER NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS referral_ledger(event_id TEXT PRIMARY KEY, invitee INTEGER NOT NULL, net INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS quest_claims(user_id INTEGER NOT NULL, day TEXT NOT NULL, quest_id TEXT NOT NULL, claimed REAL NOT NULL, PRIMARY KEY(user_id,day,quest_id));
 CREATE INDEX IF NOT EXISTS operations_user ON operations(user_id,created DESC);
 '''
 
@@ -43,7 +44,11 @@ class Store:
                 db.execute("UPDATE invoices SET held_until=created+504*3600 WHERE status='paid'")
             if 'bonus' not in {r['name'] for r in db.execute('PRAGMA table_info(invoices)')}:
                 db.execute('ALTER TABLE invoices ADD COLUMN bonus INTEGER NOT NULL DEFAULT 0')
-            db.execute('PRAGMA user_version=4')
+            ledger_columns={r['name'] for r in db.execute('PRAGMA table_info(referral_ledger)')}
+            for name,kind in [('stake','INTEGER'),('payout','INTEGER'),('created','REAL')]:
+                if name not in ledger_columns:
+                    db.execute(f'ALTER TABLE referral_ledger ADD COLUMN {name} {kind}')
+            db.execute('PRAGMA user_version=5')
 
     def backup(self, directory):
         from datetime import datetime, timezone
