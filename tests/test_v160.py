@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import datetime, timezone
 from tests import test_v150 as fixtures
@@ -19,6 +20,7 @@ class Bonus160Tests(unittest.TestCase):
     def deposit(self,value,uid=200):
         with self.s.store.tx() as db:
             funding_id=ident()
+            db.execute('INSERT INTO transfers VALUES(?,?,?,?,?,?)',(funding_id,uid,'deposit','approved',json.dumps(dict(value=value)),self.now))
             self.s.register_funding(db,uid,funding_id,round(value*100))
         return funding_id
 

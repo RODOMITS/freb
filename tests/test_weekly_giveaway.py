@@ -10,7 +10,10 @@ class WeeklyGiveawayTests(unittest.TestCase):
     call=fixtures.Release150Tests.call
 
     def funding(self,amount=50):
-        with self.s.store.tx() as db:self.s.register_funding(db,200,ident(),int(amount*100))
+        with self.s.store.tx() as db:
+            funding_id=ident()
+            db.execute('INSERT INTO transfers VALUES(?,?,?,?,?,?)',(funding_id,200,'deposit','approved',json.dumps(dict(value=amount)),self.now))
+            self.s.register_funding(db,200,funding_id,int(amount*100))
 
     def test_daily_round_migration_preserves_seed_tickets_and_deadline(self):
         day=self.s.bonus_calendar(self.now)['day'];seed='existing-daily-seed'
@@ -18,6 +21,7 @@ class WeeklyGiveawayTests(unittest.TestCase):
             db.execute('DROP TABLE giveaway_rounds')
             db.execute('CREATE TABLE giveaway_rounds(day TEXT PRIMARY KEY,seed TEXT NOT NULL,commitment TEXT NOT NULL)')
             db.execute('INSERT INTO giveaway_rounds VALUES(?,?,?)',(day,seed,commitment(seed)))
+            db.execute('INSERT INTO transfers VALUES(?,?,?,?,?,?)',('old-ticket',200,'deposit','approved',json.dumps(dict(value=50)),self.now))
             db.execute('INSERT INTO funding_bonuses(id,user_id,amount,created,giveaway_day) VALUES(?,?,?,?,?)',('old-ticket',200,5000,self.now,day))
         self.s=Service('/virtual/release150.db',admins=(100,),clock=lambda:self.now)
         before=self.s.state(200);g=before['bonuses']['giveaway']
