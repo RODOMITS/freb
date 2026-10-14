@@ -5,6 +5,7 @@ import math
 import re
 import secrets
 import time
+import threading
 import uuid
 import unicodedata
 from datetime import datetime, timezone, timedelta
@@ -38,6 +39,8 @@ class Service:
         self.store, self.admins, self.clock = Store(path), set(admins), clock
         self.limits=limits or Limits()
         self.starting_balance = cents(starting_balance)
+        self.presence={}
+        self.presence_lock=threading.Lock()
         catalog = json.loads(Path(__file__).with_name('catalog.json').read_text(encoding='utf-8'))
         self.items = {item['id']:item for item in catalog['items']}
         self.deposit_ids=["garama","cash","burguro","capitano","mobybros","cerberus","pegasus","boppin","globa","fortunu","rosey","casaboo","hydrabunny","kraken","jellymoby","cakini","bunny","dragon","antonio","lovebear"].copy()
@@ -355,9 +358,17 @@ class Service:
         self.referral_result(db,uid,game['id'],game['stakeValue'],payout/100)
         self.operation(db,uid,'rocket','Ракетка','win' if multiplier else 'lose',payout,detail,op_id=game['id'])
 
+    def online_count(self, uid):
+        now=self.clock()
+        with self.presence_lock:
+            self.presence[uid]=now
+            self.presence={user:seen for user,seen in self.presence.items() if seen>now-60}
+            return len(self.presence)
+
     def snapshot(self, db, uid, history_limit=200):
         row, state = load_user(db,uid)
         result = copy.deepcopy(state)
+        result['onlineCount']=self.online_count(uid)
         result['balance'] /= 100
         result['quests']=self.quests(db,uid)
         result['bonuses']=self.bonuses(db,uid)

@@ -259,3 +259,5 @@ dialog:has(.wallet-modal){width:560px}.wallet-deposit-form{margin:18px 0}.wallet
 /* Fixed mobile viewport without blocking scrolling within feeds and inventories. */
 html,body{width:100%;max-width:100%;overflow-x:hidden;overflow-x:clip;touch-action:pan-x pan-y;overscroll-behavior-x:none}
 @media(hover:none) and (pointer:coarse){input,select,textarea{font-size:16px!important}}
+
+.online-badge{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:500;letter-spacing:0;color:var(--muted);white-space:nowrap}.online-badge strong{color:var(--cyan);font-weight:800}.live-heading{flex-wrap:wrap}

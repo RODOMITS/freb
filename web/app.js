@@ -121,7 +121,7 @@ function itemCard(item, options = {}) {
 }
 const previewFeed = [];
 function feedMarkup() {
-  return `<section class="live-section" aria-label="Последние дропы"><div class="live-heading"><span class="live-dot"></span>Последние дропы</div><div class="live-track">${[...state.feed, ...(server ? [] : previewFeed)].slice(0, 12).map(drop => {
+  return `<section class="live-section" aria-label="Последние дропы"><div class="live-heading"><span class="live-dot"></span>Последние дропы<span class="online-badge">Сейчас онлайн: <strong data-online-count>${Number.isSafeInteger(state.onlineCount) ? state.onlineCount : 0}</strong></span></div><div class="live-track">${[...state.feed, ...(server ? [] : previewFeed)].slice(0, 12).map(drop => {
     const item = ITEM_BY_ID[drop.itemId];
     return `<div class="drop-pill ${item.rarity}"><img src="${item.image}" alt="${esc(item.name)}"><div><strong>${esc(item.name)}</strong>${!drop.preview ? `<small>${esc(drop.playerName || playerName)}</small>` : ''}<div class="drop-price">✦ ${money(item.value)}</div></div></div>`;
   }).join('')}</div></section>`;
@@ -133,6 +133,7 @@ function topDropMarkup() {
 }
 function refreshLiveDrops(before) {
   if(activeRoute!=='cases')return;
+  const online=$('[data-online-count]');if(online)online.textContent=String(Number.isSafeInteger(state.onlineCount) ? state.onlineCount : 0);
   if(JSON.stringify(before.feed)!==JSON.stringify(state.feed) && $('.live-section'))$('.live-section').outerHTML=feedMarkup();
   if(JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) && $('.top-drop-slot'))$('.top-drop-slot').innerHTML=topDropMarkup();
 }
