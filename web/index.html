@@ -2,14 +2,23 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <script>
+// Keep native multi-touch zoom from moving the Mini App; single-touch scrolling stays native.
+for (const name of ['gesturestart','gesturechange','gestureend']) {
+  document.addEventListener(name,event=>event.preventDefault(),{passive:false});
+}
+document.addEventListener('touchmove',event=>{
+  if(event.touches.length>1)event.preventDefault();
+},{passive:false});
+</script>
   <meta name="theme-color" content="#100f1b">
   <meta name="description" content="Brainrot Freebie — кейсы, апгрейдер и инвентарь брейнротов.">
   <title>Brainrot Freebie</title>
   <link rel="icon" href="img/logotype.png">
-  <link rel="stylesheet" href="styles.css?v=v1-6-3-20261014">
+  <link rel="stylesheet" href="styles.css?v=v1-6-4-20261014">
   <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
-  <script src="app.js?v=v1-6-3-20261014" type="module"></script>
+  <script src="app.js?v=v1-6-4-20261014" type="module"></script>
 </head>
 <body>
   <div class="ambient" aria-hidden="true"></div>
