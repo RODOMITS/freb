@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS referrals(invitee INTEGER PRIMARY KEY, inviter INTEGE
 CREATE TABLE IF NOT EXISTS referral_ledger(event_id TEXT PRIMARY KEY, invitee INTEGER NOT NULL, net INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS quest_claims(user_id INTEGER NOT NULL, day TEXT NOT NULL, quest_id TEXT NOT NULL, claimed REAL NOT NULL, PRIMARY KEY(user_id,day,quest_id));
 CREATE TABLE IF NOT EXISTS bot_dialogs(actor INTEGER PRIMARY KEY, request_id TEXT NOT NULL, last_sent REAL NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS funding_bonuses(id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, amount INTEGER NOT NULL, created REAL NOT NULL, active INTEGER NOT NULL DEFAULT 1, case_used INTEGER NOT NULL DEFAULT 0, giveaway_day TEXT, cashback_paid INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS weekly_bonus_claims(user_id INTEGER NOT NULL, kind TEXT NOT NULL, week TEXT NOT NULL, created REAL NOT NULL, PRIMARY KEY(user_id,kind,week));
+CREATE TABLE IF NOT EXISTS giveaway_rounds(day TEXT PRIMARY KEY, seed TEXT NOT NULL, commitment TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS giveaway_draws(day TEXT PRIMARY KEY, winner INTEGER, ticket_id TEXT, participants INTEGER NOT NULL, seed TEXT NOT NULL, commitment TEXT NOT NULL, created REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS funding_user ON funding_bonuses(user_id,created);
 CREATE INDEX IF NOT EXISTS operations_user ON operations(user_id,created DESC);
 '''
 
@@ -65,7 +70,7 @@ class Store:
                         payload.pop('reply_markup',None)
                         payload['text']=payload.get('text','').split('\nНажми «Ответить»')[0]+'\nИгрок направлен в @BrainrotFreebie_deposit_bot.'
                         db.execute('UPDATE outbox SET payload=? WHERE id=?',(json.dumps(payload,ensure_ascii=False),row['id']))
-            db.execute('PRAGMA user_version=8')
+            db.execute('PRAGMA user_version=9')
 
     def backup(self, directory):
         from datetime import datetime, timezone

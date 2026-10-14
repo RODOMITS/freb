@@ -39,9 +39,24 @@ class Service:
             self.cases[case_id] = dict(id=case_id,name=name,price=0,free=free,theme='Бесплатные',hue=hue,image='img/cases/daily.png' if case_id=='daily' else 'img/cases/subscribe.png',drops=[dict(itemId=i,baseChance=p) for i,p in ([('67',.94),('lagrand',.05),('bananito',.01)] if case_id=='daily' else [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)])])
         for case_id,name in [('referral','За приглашение'),('nickname','За ник')]:
             self.cases[case_id]=dict(id=case_id,name=name,price=0,free=case_id,theme='Бесплатные',hue=0,image='img/cases/'+case_id+'.png',drops=[dict(itemId=i,baseChance=p) for i,p in [('67',.85),('lagrand',.10),('bananito',.04),('esok',.01)]])
+        referral=self.cases['referral']
+        # Keep the referral weights; upgrade each reward to a weighted pair
+        # bracketing 150% of its value, preserving the exact expected multiplier.
+        reward_weights={}
+        ordered=sorted(self.items.values(),key=lambda i:i['value'])
+        for drop in referral['drops']:
+            desired=self.items[drop['itemId']]['value']*1.5
+            low=max((i for i in ordered if i['value']<=desired),key=lambda i:i['value'])
+            high=next((i for i in ordered if i['value']>=desired),ordered[-1])
+            fraction=(desired-low['value'])/(high['value']-low['value']) if high['value']>low['value'] else 0
+            for item,weight in [(low,1-fraction),(high,fraction)]:
+                if weight: reward_weights[item['id']]=reward_weights.get(item['id'],0)+drop['baseChance']*weight
+        reward_drops=[dict(itemId=i,baseChance=p) for i,p in reward_weights.items()]
+        self.cases['deposit']=dict(id='deposit',name='Кейс за депозит',price=0,free='deposit',theme='Бесплатные',hue=0,image='img/cases/deposit.png',drops=reward_drops)
+        self.cases.setdefault('allornothing',dict(id='allornothing',name='Всё или ничего',price=400,theme='Средние',hue=0,image='img/cases/allornothing.png',drops=[dict(itemId='garama',baseChance=.7),dict(itemId='dragon',baseChance=.3)]))
         web_root=Path(__file__).resolve().parent.parent
         web_root=web_root/'web' if (web_root/'web').exists() else web_root
-        self.cases={key:case for key,case in self.cases.items() if (web_root/case['image']).is_file()}
+        self.cases={key:case for key,case in self.cases.items() if key in ('deposit','allornothing') or (web_root/case['image']).is_file()}
         for case in self.cases.values():
             distribution(case,self.items)
 
@@ -70,6 +85,66 @@ class Service:
         msk=datetime.fromtimestamp(now,timezone(timedelta(hours=3)))
         return msk.weekday()==5 and msk.hour==16
 
+
+    @staticmethod
+    def bonus_calendar(now):
+        msk=datetime.fromtimestamp(now,timezone(timedelta(hours=3)))
+        day=msk.replace(hour=0,minute=0,second=0,microsecond=0)
+        monday=day-timedelta(days=msk.weekday())
+        saturday=monday+timedelta(days=5,hours=10)
+        return dict(day=day.strftime('%Y-%m-%d'),week=monday.strftime('%Y-%m-%d'),weekStart=monday.timestamp(),dayEnd=(day+timedelta(days=1)).timestamp(),open=msk.weekday()==5 and 10<=msk.hour<20,nextOpen=(saturday if msk<saturday else saturday+timedelta(days=7)).timestamp()*1000)
+
+    def register_funding(self, db, uid, funding_id, amount):
+        # Principal only: referral boosts and administrator credits are excluded.
+        db.execute('INSERT OR IGNORE INTO funding_bonuses(id,user_id,amount,created) VALUES(?,?,?,?)',(funding_id,uid,amount,self.clock()))
+
+    def revoke_funding(self, db, uid, funding_id, state):
+        row=db.execute('SELECT * FROM funding_bonuses WHERE id=? AND active=1',(funding_id,)).fetchone()
+        if not row: return
+        db.execute('UPDATE funding_bonuses SET active=0 WHERE id=?',(funding_id,))
+        # Claw back cashback already paid if its underlying Stars purchase is refunded.
+        extra=row['cashback_paid']
+        if extra:
+            used=min(extra,state['balance'])
+            state['balance']-=used;state['debt']=state.get('debt',0)+extra-used
+            self.operation(db,uid,'cashback','Отмена кэшбэка',delta=-used,detail='Возврат пополнения')
+
+    def bonuses(self, db, uid):
+        calendar=self.bonus_calendar(self.clock())
+        rows=db.execute('SELECT * FROM funding_bonuses WHERE user_id=? AND active=1',(uid,)).fetchall()
+        pending={r['id'] for r in db.execute("SELECT id FROM invoices WHERE user_id=? AND status='refund_requested'",(uid,))}
+        rows=[r for r in rows if r['id'] not in pending]
+        claimed={r['kind'] for r in db.execute('SELECT kind FROM weekly_bonus_claims WHERE user_id=? AND week=?',(uid,calendar['week']))}
+        weekly=sum(r['amount'] for r in rows if r['created']>=calendar['weekStart'])
+        cashback=sum(max(0,r['amount']//10-r['cashback_paid']) for r in rows)
+        eligible=sum(1 for r in rows if r['amount']>=5000 and r['giveaway_day'] is None)
+        seed=new_seed()
+        db.execute('INSERT OR IGNORE INTO giveaway_rounds VALUES(?,?,?)',(calendar['day'],seed,commitment(seed)))
+        round_=db.execute('SELECT commitment FROM giveaway_rounds WHERE day=?',(calendar['day'],)).fetchone()
+        tickets=db.execute('SELECT count(*) FROM funding_bonuses WHERE active=1 AND giveaway_day=?',(calendar['day'],)).fetchone()[0]
+        mine=db.execute('SELECT count(*) FROM funding_bonuses WHERE user_id=? AND active=1 AND giveaway_day=?',(uid,calendar['day'])).fetchone()[0]
+        participants=db.execute('SELECT count(DISTINCT user_id) FROM funding_bonuses WHERE active=1 AND giveaway_day=?',(calendar['day'],)).fetchone()[0]
+        last=db.execute('SELECT * FROM giveaway_draws ORDER BY day DESC LIMIT 1').fetchone()
+        return dict(weeklyDeposits=weekly/100,cashback=cashback/100,cashbackClaimed='cashback' in claimed,partnerClaimed='partner' in claimed,claimOpen=calendar['open'],nextClaimAt=calendar['nextOpen'],week=calendar['week'],depositCases=sum(1 for r in rows if r['amount']>=10000 and not r['case_used']),giveaway=dict(serverHash=round_['commitment'],day=calendar['day'],drawAt=calendar['dayEnd']*1000,eligible=eligible,tickets=tickets,myTickets=mine,participants=participants,last=dict(day=last['day'],winnerId=last['winner'],participants=last['participants'],serverSeed=last['seed'],serverHash=last['commitment']) if last else None))
+
+    def draw_giveaways(self, db):
+        calendar=self.bonus_calendar(self.clock())
+        days=db.execute('SELECT DISTINCT giveaway_day FROM funding_bonuses WHERE giveaway_day IS NOT NULL AND giveaway_day<? ORDER BY giveaway_day',(calendar['day'],)).fetchall()
+        for row in days:
+            day=row['giveaway_day']
+            if db.execute('SELECT 1 FROM giveaway_draws WHERE day=?',(day,)).fetchone(): continue
+            tickets=db.execute("SELECT f.id,f.user_id FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.giveaway_day=? AND f.active=1 AND coalesce(i.status,'') NOT IN ('refund_requested','refunded') ORDER BY f.id",(day,)).fetchall()
+            round_=db.execute('SELECT seed FROM giveaway_rounds WHERE day=?',(day,)).fetchone()
+            seed=round_['seed'] if round_ else new_seed();rng=FairRandom(seed,day,0)
+            ticket=tickets[min(len(tickets)-1,int(rng.draw()*len(tickets)))] if tickets else None
+            winner=ticket['user_id'] if ticket else None
+            db.execute('INSERT INTO giveaway_draws VALUES(?,?,?,?,?,?,?)',(day,winner,ticket['id'] if ticket else None,len(tickets),seed,commitment(seed),self.clock()))
+            if winner is not None:
+                _,state=load_user(db,winner)
+                self.add_item(state,'casaboo');save_user(db,winner,state)
+                self.operation(db,winner,'giveaway','Ежедневный розыгрыш','win',detail='La Casa Boo · '+day,op_id='giveaway-'+day)
+                db.execute('INSERT OR IGNORE INTO outbox(id,message,method,payload) VALUES(?,?,?,?)',('giveaway-'+day,'','sendMessage',json.dumps(dict(chat_id=winner,text='Ты выиграл La Casa Boo в ежедневном розыгрыше! Предмет уже в инвентаре.'))))
+
     def referral_result(self, db, uid, event_id, stake, payout):
         funded=db.execute("SELECT 1 FROM invoices WHERE user_id=? AND status='paid' UNION ALL SELECT 1 FROM transfers WHERE user_id=? AND kind='deposit' AND status='approved' LIMIT 1",(uid,uid)).fetchone()
         if funded and db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone():
@@ -96,7 +171,7 @@ class Service:
             net+=min(loss,funding['amount']);deposits+=funding['amount'];deposit_count+=funding['count'];depositors+=int(funding['amount']>0)
             turnover+=(row['stake'] or 0) if row else 0;payouts+=(row['payout'] or 0) if row else 0;games+=row['count'] if row else 0;unknown+=row['unknown'] if row else 0
             profile=json.loads(person['profile'])
-            details.append(dict(name=('@'+profile['username']) if profile.get('username') else profile.get('first_name','Игрок'),registeredAt=person['created']*1000,deposits=funding['amount']/100,netResult=loss/100,turnover=((row['stake'] or 0)/100) if row else 0,games=row['count'] if row else 0))
+            details.append(dict(depositCount=funding['count'],name=('@'+profile['username']) if profile.get('username') else profile.get('first_name','Игрок'),registeredAt=person['created']*1000,deposits=funding['amount']/100,netResult=loss/100,turnover=((row['stake'] or 0)/100) if row else 0,games=row['count'] if row else 0))
         count=len(people)
         rate=55 if count>=100 else 50 if count>=50 else 45 if count>=25 else 40
         earned=max(0,net)*rate//100
@@ -199,6 +274,7 @@ class Service:
             return
         uid=invoice['user_id']
         _,state=load_user(db,uid)
+        self.revoke_funding(db,uid,invoice['id'],state)
         delta=invoice['stars']*150+invoice['bonus'] if invoice['status'] in ('paid','refund_requested') else 0
         used=min(delta,state['balance'])
         state['balance']-=used
@@ -231,6 +307,7 @@ class Service:
         return game
 
     def tick(self, db):
+        self.draw_giveaways(db)
         now = self.clock()*1000
         # Settle stored wagers before rotating the public round, including after restart.
         for row in db.execute('SELECT id,state FROM users').fetchall():
@@ -275,6 +352,7 @@ class Service:
         result = copy.deepcopy(state)
         result['balance'] /= 100
         result['quests']=self.quests(db,uid)
+        result['bonuses']=self.bonuses(db,uid)
         result['inventoryHash']=hashlib.sha256(','.join(sorted(e['uid'] for e in state['inventory'])).encode()).hexdigest()
         result['partner']=self.partner(db,uid)
         parent=db.execute('SELECT p.code FROM referrals r JOIN partners p ON p.user_id=r.inviter WHERE r.invitee=?',(uid,)).fetchone()
@@ -378,6 +456,23 @@ class Service:
             control=db.execute("SELECT value FROM controls WHERE name='paused'").fetchone()
             if control and control['value']:
                 raise ValueError('Приём новых ставок временно приостановлен. Активные игры продолжаются.')
+        if action in ('cashback-claim','giveaway-enter'):
+            bonus=self.bonuses(db,uid);calendar=self.bonus_calendar(now)
+            if action=='giveaway-enter':
+                ticket=db.execute("SELECT f.id FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.user_id=? AND f.active=1 AND f.amount>=5000 AND f.giveaway_day IS NULL AND coalesce(i.status,'') NOT IN ('refund_requested','refunded') ORDER BY f.created,f.id LIMIT 1",(uid,)).fetchone()
+                if not ticket: raise ValueError('Для участия нужен подтверждённый депозит от 50 BStars')
+                db.execute('UPDATE funding_bonuses SET giveaway_day=? WHERE id=?',(calendar['day'],ticket['id']))
+                self.operation(db,uid,'giveaway','Участие в розыгрыше',detail=calendar['day'])
+                return dict(entered=True)
+            if not bonus['claimOpen']: raise ValueError('Кэшбэк доступен в субботу с 10:00 до 20:00 МСК')
+            if bonus['cashbackClaimed']: raise ValueError('Кэшбэк на этой неделе уже получен')
+            rows=db.execute("SELECT f.* FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.user_id=? AND f.active=1 AND coalesce(i.status,'') NOT IN ('refund_requested','refunded')",(uid,)).fetchall()
+            amount=sum(max(0,r['amount']//10-r['cashback_paid']) for r in rows)
+            if amount<=0: raise ValueError('Нет доступного кэшбэка')
+            db.execute('INSERT INTO weekly_bonus_claims VALUES(?,?,?,?)',(uid,'cashback',calendar['week'],now))
+            for row in rows: db.execute('UPDATE funding_bonuses SET cashback_paid=? WHERE id=?',(row['amount']//10,row['id']))
+            self.credit(state,amount);self.operation(db,uid,'cashback','Кэшбэк 10%',delta=amount)
+            return dict(reward=amount/100)
         if action=='quest-claim':
             quests=self.quests(db,uid)
             quest=next((q for q in quests['items'] if q['id']==b.get('questId')),None)
@@ -414,10 +509,14 @@ class Service:
             db.execute('UPDATE partners SET code=? WHERE user_id=?',(code,uid))
             return None
         if action in ('partner-claim','partner-withdraw'):
+            bonus=self.bonuses(db,uid);calendar=self.bonus_calendar(now)
+            if not bonus['claimOpen']: raise ValueError('Комиссия доступна в субботу с 10:00 до 20:00 МСК')
+            if bonus['partnerClaimed']: raise ValueError('Комиссия на этой неделе уже получена')
             amount=self.partner(db,uid)['availableCents']
             if amount<=0: raise ValueError('Нет доступной комиссии')
             if state.get('debt',0)>0 or self.withdraw_hold(db,uid)>now:
                 raise ValueError('Вывод ограничен до завершения проверки платежей')
+            db.execute('INSERT INTO weekly_bonus_claims VALUES(?,?,?,?)',(uid,'partner',calendar['week'],now))
             db.execute('UPDATE partners SET claimed=claimed+? WHERE user_id=?',(amount,uid))
             if action=='partner-claim':
                 self.credit(state,amount)
@@ -438,8 +537,12 @@ class Service:
                 raise ValueError('Выбери открытие ×1 или ×3 для платного кейса')
             if case.get('free'):
                 previous=db.execute('SELECT claimed FROM claims WHERE user_id=? AND case_id=?',(uid,case['id'])).fetchone()
-                if previous and (case['free'] not in ('daily','subscribe','nickname') or now<previous['claimed']+86400):
+                if previous and case['free']!='deposit' and (case['free'] not in ('daily','subscribe','nickname') or now<previous['claimed']+86400):
                     raise ValueError('Кейс пока недоступен')
+                if case['free']=='deposit':
+                    funding=db.execute("SELECT f.id FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.user_id=? AND f.active=1 AND f.amount>=10000 AND f.case_used=0 AND coalesce(i.status,'') NOT IN ('refund_requested','refunded') ORDER BY f.created,f.id LIMIT 1",(uid,)).fetchone()
+                    if not funding: raise ValueError('Для кейса нужен подтверждённый депозит от 100 BStars')
+                    db.execute('UPDATE funding_bonuses SET case_used=1 WHERE id=?',(funding['id'],))
                 if case['free']=='subscribe' and not b.get('_subscribed'):
                     raise ValueError('Подпишись на канал для открытия кейса')
                 if case['free']=='referral' and not db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone():
@@ -686,6 +789,8 @@ class Service:
                 if transfer['kind']=='withdraw' and approve and not self.withdrawal_open(now):
                     raise ValueError('Выдача предметов только в субботу с 16:00 до 17:00 МСК')
                 if transfer['kind']=='partner-withdraw':
+                    if approve and not self.bonus_calendar(now)['open']:
+                        raise ValueError('Выдача комиссии только в субботу с 10:00 до 20:00 МСК')
                     if approve and (target_state.get('debt',0)>0 or self.withdraw_hold(db,target)>now):
                         raise ValueError('Вывод комиссии заблокирован проверкой платежей')
                     if not approve:
@@ -694,6 +799,8 @@ class Service:
                     raise ValueError('Вывод заблокирован: возврат Stars или срок удержания')
                 delta=cents(data['value'])+data.get('bonus',0) if transfer['kind']=='deposit' and approve else 0
                 self.credit(target_state,delta)
+                if transfer['kind']=='deposit' and approve:
+                    self.register_funding(db,target,transfer['id'],cents(data['value']))
                 if transfer['kind']=='withdraw' and not approve:
                     target_state['inventory'].extend(data['entries'])
                 if target!=uid:

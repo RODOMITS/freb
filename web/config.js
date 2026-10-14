@@ -890,6 +890,24 @@ export const CASES = [
         "baseChance": 0.008924069045456763
       }
     ]
+  },
+  {
+    "id": "allornothing",
+    "name": "Всё или ничего",
+    "price": 400,
+    "theme": "Средние",
+    "hue": 0,
+    "image": "img/cases/allornothing.png",
+    "drops": [
+      {
+        "itemId": "garama",
+        "baseChance": 0.7
+      },
+      {
+        "itemId": "dragon",
+        "baseChance": 0.3
+      }
+    ]
   }
 ];
 export const CASE_BY_ID = Object.fromEntries(CASES.map(c => [c.id, c]));

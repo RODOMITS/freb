@@ -129,7 +129,7 @@ function feedMarkup() {
     return `<div class="drop-pill ${item.rarity}"><img src="${item.image}" alt="${esc(item.name)}"><div><strong>${esc(item.name)}</strong>${!drop.preview ? `<small>${esc(drop.playerName || playerName)}</small>` : ''}<div class="drop-price">✦ ${money(item.value)}</div></div></div>`;
   }).join('')}</div></section>`;
 }
-const freeLabel=c=>({daily:'Раз в 24 часа',subscribe:'За подписку',referral:'По приглашению',nickname:'За ник'}[c.free] || 'Бесплатно');
+const freeLabel=c=>({daily:'Раз в 24 часа',subscribe:'За подписку',referral:'По приглашению',nickname:'За ник',deposit:'За депозит от 100'}[c.free] || 'Бесплатно');
 function renderCases() {
   const groups=Object.fromEntries(['Бесплатные','Дешёвые','Средние','Мощные'].map(name=>[name,CASES.filter(c=>(c.free ? 'Бесплатные' : c.price<=199 ? 'Дешёвые' : c.price<=699 ? 'Средние' : 'Мощные')===name)]).filter(([,cases])=>cases.length));
   const top=state.topDrop, topItem=top && ITEM_BY_ID[top.itemId];
@@ -145,10 +145,10 @@ function shuffledBrainrots(caseConfig) {
 }
 function renderCase(caseConfig) {
   const preview = Array.from({length:Math.ceil(12 / caseConfig.drops.length)}, () => shuffledBrainrots(caseConfig)).flat();
-  const claim=state.freeClaims?.[caseConfig.id], recurring=['daily','subscribe','nickname'].includes(caseConfig.free), unavailable=server && caseConfig.free && claim && (!recurring || server.now()<claim+86400000);
+  const claim=state.freeClaims?.[caseConfig.id], recurring=['daily','subscribe','nickname'].includes(caseConfig.free), unavailable=server && (caseConfig.free==='deposit' ? !state.bonuses?.depositCases : caseConfig.free && claim && (!recurring || server.now()<claim+86400000));
   return `<a class="back" href="#cases">${icon('arrow')}Все кейсы</a><section class="case-open-page"><div class="case-page-heading"><h1>${caseConfig.name}</h1></div>
     <div class="roulette" aria-label="Рулетка открытия кейса"><div class="roulette-track">${preview.map(i => itemCard(i, { eager:true })).join('')}</div><div class="roulette-selection"></div></div>
-    <div class="open-controls"><div class="case-counts">${caseConfig.free ? `<button class="primary" data-action="open-case" data-count="1" data-id="${caseConfig.id}" ${unavailable ? 'disabled' : ''}>${icon('box')}${unavailable ? recurring ? 'Доступен раз в 24 часа' : 'Уже получен' : 'Открыть бесплатно'}</button>` : [1,3].map(count=>`<button class="${count===1 ? 'primary' : 'secondary'}" data-action="open-case" data-count="${count}" data-id="${caseConfig.id}" ${state.balance<caseConfig.price*count ? 'disabled' : ''}><strong>×${count}</strong><span>Открыть · ✦ ${money(caseConfig.price*count)}</span></button>`).join('')}</div>${fastButton()}</div>${caseBonusHint(caseConfig)}
+    <div class="open-controls"><div class="case-counts">${caseConfig.free ? `<button class="primary" data-action="open-case" data-count="1" data-id="${caseConfig.id}" ${unavailable ? 'disabled' : ''}>${icon('box')}${unavailable ? caseConfig.free==='deposit' ? 'Депозит от 100 BStars' : recurring ? 'Доступен раз в 24 часа' : 'Уже получен' : 'Открыть бесплатно'}</button>` : [1,3].map(count=>`<button class="${count===1 ? 'primary' : 'secondary'}" data-action="open-case" data-count="${count}" data-id="${caseConfig.id}" ${state.balance<caseConfig.price*count ? 'disabled' : ''}><strong>×${count}</strong><span>Открыть · ✦ ${money(caseConfig.price*count)}</span></button>`).join('')}</div>${fastButton()}</div>${caseBonusHint(caseConfig)}
     ${state.balance < caseConfig.price ? '<div class="demo-banner" style="margin:-16px 0 24px;text-align:center">Не хватает BStars. <button data-action="topup" style="color:var(--pink)">Пополнить баланс →</button></div>' : ''}
     <div class="contents-heading"><h2>Что внутри кейса</h2><button class="info-link" data-action="case-odds" data-id="${caseConfig.id}">Шансы выпадения ⓘ</button></div><div class="item-grid">${caseConfig.drops.map(d => itemCard(ITEM_BY_ID[d.itemId], { chance: d.baseChance })).join('')}</div>
     </section>`;
@@ -224,7 +224,7 @@ function renderProfile() {
   return `<div class="profile-head compact-head"><h1>Профиль</h1><button class="admin-link" data-action="settings">Настройки</button><a class="admin-link" href="#admin">${icon('shield')}Админ-панель</a></div><section class="profile-card"><div class="avatar">${safePhoto ? `<img src="${esc(safePhoto)}" alt="Аватар пользователя" referrerpolicy="no-referrer">` : esc(playerName.replace('@','').slice(0,2).toUpperCase())}</div><div class="profile-identity"><h2>${esc(playerName)}</h2></div><div class="profile-stats"><div><strong>${money(state.stats.opened)}</strong><small>Кейсов открыто</small></div><div><strong>${money(state.stats.upgrades)}</strong><small>Апгрейдов</small></div><div><strong>${money(state.stats.wins)}</strong><small>Успешных</small></div></div></section>
     <section class="promo-panel">${icon('gift')}<div class="promo-copy"><strong>Промокод</strong></div><form class="promo-form" id="promo-form"><input name="promo" autocomplete="off" aria-label="Промокод" placeholder="Промокод" maxlength="30" required><button class="primary">Активировать</button></form></section>
     <section><div class="inventory-heading"><h2>Инвентарь <span>${state.inventory.length+(state.pendingInventory || []).length}</span></h2><div class="wallet-actions"><button class="secondary" data-action="sell-all" ${!state.inventory.length ? 'disabled' : ''}>Продать всё</button><button class="primary" data-action="topup">${icon('plus')}Пополнить</button><button class="secondary" data-action="withdraw">${icon('withdraw')}Вывод</button></div></div><div class="inventory-meta"><span>Нажми на брейнрота, чтобы продать</span><span>Стоимость: ✦ ${money(totalValue)}</span></div>${state.inventory.length ? `<div class="item-grid inventory-grid">${state.inventory.map(i => itemCard(ITEM_BY_ID[i.itemId], { action: 'sell', id: i.uid, sale: true })).join('')}</div>` : inventoryEmpty()}
-    ${pendingInventoryMarkup()}${partnerMarkup()}${!storageWorks ? '<p class="storage-error">Браузер запретил локальное сохранение. После перезагрузки прогресс может сброситься.</p>' : ''}</section>${renderHistory(state,historyFilter,historyLimit,featureUI)}`;
+    ${pendingInventoryMarkup()}${!storageWorks ? '<p class="storage-error">Браузер запретил локальное сохранение. После перезагрузки прогресс может сброситься.</p>' : ''}</section>${renderHistory(state,historyFilter,historyLimit,featureUI)}`;
 }
 function pendingInventoryMarkup() {
   const pending=state.pendingInventory || [];
@@ -233,22 +233,30 @@ function pendingInventoryMarkup() {
 function partnerMarkup() {
   if(!server || !state.partner)return '';
   const p=state.partner, link=server.config.botUsername ? `https://t.me/${server.config.botUsername}?start=ref_${p.code}` : '';
-  const metrics=[['Приглашено',p.count],['Доступно',`✦ ${money(p.available)}`],['Получено',`✦ ${money((p.claimedOnBalance || 0)+(p.withdrawn || 0))}`]];
-  return `<section class="partner-panel"><div class="selection-title"><h2>Приглашай друзей</h2><strong>${p.revShare || 40}% RevShare</strong></div><p>Комиссия от чистого проигрыша приглашённых.</p>${p.nextTier ? `<div class="partner-tier">До ${p.nextTier.rate}% осталось ${Math.max(0,p.nextTier.count-p.count)} человек<progress value="${p.count}" max="${p.nextTier.count}"></progress></div>` : '<div class="partner-tier">Максимальный уровень — 55%</div>'}<div class="partner-stats">${metrics.map(([label,value])=>`<span>${label}<b>${value}</b></span>`).join('')}</div><form id="partner-code-form" class="promo-form"><input name="code" value="${esc(p.code)}" minlength="4" maxlength="24" required aria-label="Реферальный код"><button class="secondary">Сохранить код</button></form>${link ? `<input class="referral-link" readonly value="${esc(link)}" aria-label="Реферальная ссылка"><button class="secondary" data-action="copy-referral">Копировать ссылку</button>` : '<p>Ссылка появится после настройки имени бота.</p>'}<div class="game-actions"><button class="primary" data-action="partner-claim" ${p.available<=0 ? 'disabled' : ''}>Забрать на баланс</button><button class="secondary" data-action="partner-withdraw" ${p.available<=0 ? 'disabled' : ''}>Вывести комиссию</button></div><small>Комиссию можно вывести в любой день. Проверки платежей сохраняются.</small>${(state.transfers || []).filter(t=>t.kind==='partner-withdraw' && t.status==='pending' && (!t.userId || t.userId===state.profile.id)).map(t=>`<p>Комиссия на выводе: ${money(t.data.value)} <button class="info-link" data-action="withdraw-cancel" data-id="${t.id}">Отменить</button></p>`).join('')}</section>`;
+  const metrics=[['Приглашено',p.count],['Депозитов',p.depositCount || 0],['Сумма пополнений',`✦ ${money(p.deposits || 0)}`],['Доступно',`✦ ${money(p.available)}`],['Получено',`✦ ${money((p.claimedOnBalance || 0)+(p.withdrawn || 0))}`]];
+  return `<section class="partner-panel"><div class="selection-title"><h2>Приглашай друзей</h2><strong>${p.revShare || 40}% RevShare</strong></div><p>Комиссия от чистого проигрыша приглашённых.</p>${p.nextTier ? `<div class="partner-tier">До ${p.nextTier.rate}% осталось ${Math.max(0,p.nextTier.count-p.count)} человек<progress value="${p.count}" max="${p.nextTier.count}"></progress></div>` : '<div class="partner-tier">Максимальный уровень — 55%</div>'}<div class="partner-stats">${metrics.map(([label,value])=>`<span>${label}<b>${value}</b></span>`).join('')}</div><form id="partner-code-form" class="promo-form"><input name="code" value="${esc(p.code)}" minlength="4" maxlength="24" required aria-label="Реферальный код"><button class="secondary">Сохранить код</button></form>${link ? `<input class="referral-link" readonly value="${esc(link)}" aria-label="Реферальная ссылка"><button class="secondary" data-action="copy-referral">Копировать ссылку</button>` : '<p>Ссылка появится после настройки имени бота.</p>'}<div class="game-actions"><button class="primary" data-action="partner-claim" ${p.available<=0 || !state.bonuses?.claimOpen || state.bonuses?.partnerClaimed ? 'disabled' : ''}>Забрать на баланс</button><button class="secondary" data-action="partner-withdraw" ${p.available<=0 ? 'disabled' : ''}>Вывести комиссию</button></div><small>Комиссия — раз в неделю, в субботу с 10:00 до 20:00 МСК. Проверки платежей сохраняются.</small>${(state.transfers || []).filter(t=>t.kind==='partner-withdraw' && t.status==='pending' && (!t.userId || t.userId===state.profile.id)).map(t=>`<p>Комиссия на выводе: ${money(t.data.value)} <button class="info-link" data-action="withdraw-cancel" data-id="${t.id}">Отменить</button></p>`).join('')}</section>`;
 }
+
+function bonusMarkup() {
+  const b=state.bonuses;if(!b)return '';
+  const g=b.giveaway,item=ITEM_BY_ID.casaboo;
+  const draw=new Date(g.drawAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'});
+  return `<section class="bonus-giveaway"><div class="bonus-prize"><img src="${item.image}" alt="${esc(item.name)}"></div><div class="bonus-giveaway-copy"><span class="bonus-eyebrow">ЕЖЕДНЕВНЫЙ РОЗЫГРЫШ</span><h2>La Casa Boo</h2><p>Один депозит от 50 BStars — один билет.</p><div class="bonus-numbers"><span>Участников<b>${g.participants}</b></span><span>Твоих билетов<b>${g.myTickets}</b></span><span>Всего билетов<b>${g.tickets}</b></span></div><button class="primary" data-action="giveaway-enter" ${g.eligible<=0 ? 'disabled' : ''}>${g.eligible>0 ? 'Участвовать · '+g.eligible+' доступно' : g.myTickets ? 'Ты участвуешь' : 'Пополнение от 50 BStars'}</button><small>Итоги: ${draw} МСК</small>${g.last?.winnerId ? `<small>Розыгрыш ${esc(g.last.day)} завершён. Победитель получил предмет.</small>` : ''}</div></section><section class="bonus-cashback"><div class="selection-title"><h2>Кэшбэк</h2><strong>10%</strong></div><div class="bonus-numbers"><span>Пополнено за неделю<b>✦ ${money(b.weeklyDeposits)}</b></span><span>Доступно на баланс<b>✦ ${money(b.cashback)}</b></span></div><button class="primary" data-action="cashback-claim" ${!b.claimOpen || b.cashbackClaimed || b.cashback<=0 ? 'disabled' : ''}>${b.cashbackClaimed ? 'Получен на этой неделе' : 'Забрать кэшбэк'}</button><p>Раз в неделю: суббота, 10:00–20:00 МСК. Остаток переносится на следующую неделю. Бонус к депозиту не учитывается.</p></section>`;
+}
+
 function renderQuests() {
   const q=state.quests;
-  if(!server || !q)return '<section class="empty-state"><h1>Квесты</h1><p>Ежедневные квесты доступны в Telegram.</p></section>';
-  return `<div class="compact-head"><h1>Квесты</h1><span>Каждый день</span></div><p class="quest-reset">Обновление в 00:00 МСК</p><div class="quests-grid">${q.items.map(i=>`<section class="quest-card"><div class="quest-icon">${icon(({case:'box',upgrade:'upgrade',slots:'slots',mines:'mines',rocket:'rocket'})[i.kind] || 'gift')}</div><h2>${esc(i.title)}</h2><strong class="quest-reward">✦ ${money(i.reward)} BStars</strong><progress value="${i.progress}" max="${i.goal}"></progress><div class="quest-progress">${i.progress} / ${i.goal}</div><button class="${i.claimed ? 'secondary' : 'primary'}" data-action="quest-claim" data-id="${i.id}" ${i.claimed || i.progress<i.goal ? 'disabled' : ''}>${i.claimed ? 'Награда получена' : i.progress>=i.goal ? 'Забрать награду' : 'Выполни задание'}</button></section>`).join('')}</div>`;
+  if(!server || !q)return '<section class="empty-state"><h1>Бонусы</h1><p>Ежедневные бонусы доступны в Telegram.</p></section>';
+  return `<div class="compact-head"><h1>Бонусы</h1><span>Каждый день</span></div>${bonusMarkup()}${partnerMarkup()}<div class="bonus-heading"><h2>Ежедневные квесты</h2></div><p class="quest-reset">Обновление в 00:00 МСК</p><div class="quests-grid">${q.items.map(i=>`<section class="quest-card"><div class="quest-icon">${icon(({case:'box',upgrade:'upgrade',slots:'slots',mines:'mines',rocket:'rocket'})[i.kind] || 'gift')}</div><h2>${esc(i.title)}</h2><strong class="quest-reward">✦ ${money(i.reward)} BStars</strong><progress value="${i.progress}" max="${i.goal}"></progress><div class="quest-progress">${i.progress} / ${i.goal}</div><button class="${i.claimed ? 'secondary' : 'primary'}" data-action="quest-claim" data-id="${i.id}" ${i.claimed || i.progress<i.goal ? 'disabled' : ''}>${i.claimed ? 'Награда получена' : i.progress>=i.goal ? 'Забрать награду' : 'Выполни задание'}</button></section>`).join('')}</div>`;
 }
 function settingsDialog() {
-  openModal(`<div class="modal-content settings-modal"><h2>Настройки</h2><div class="settings-row"><div><strong>Звук</strong><p>Нажатия и игровые эффекты</p></div><button class="secondary" data-action="settings-sound" aria-pressed="${sound.enabled}">${sound.enabled ? 'Включён' : 'Выключен'}</button></div><div class="settings-row"><div><strong>Режим стримера</strong><p>Размывает пополнение, вывод, баланс и личные данные</p></div><button class="secondary" data-action="settings-streamer" aria-pressed="${streamerMode}">${streamerMode ? 'Включён' : 'Выключен'}</button></div><p class="settings-version">Brainrot Freebie · версия ${esc(server?.config?.version || '1.5.0')}</p></div>`);
+  openModal(`<div class="modal-content settings-modal"><h2>Настройки</h2><div class="settings-row"><div><strong>Звук</strong><p>Нажатия и игровые эффекты</p></div><button class="secondary" data-action="settings-sound" aria-pressed="${sound.enabled}">${sound.enabled ? 'Включён' : 'Выключен'}</button></div><div class="settings-row"><div><strong>Режим стримера</strong><p>Размывает пополнение, вывод, баланс и личные данные</p></div><button class="secondary" data-action="settings-streamer" aria-pressed="${streamerMode}">${streamerMode ? 'Включён' : 'Выключен'}</button></div><p class="settings-version">Brainrot Freebie · версия ${esc(server?.config?.version || '1.6.0')}</p></div>`);
 }
 function subscriptionPrompt() {
   openModal('<div class="modal-content"><h2>Кейс за подписку</h2><p>Подпишись на канал, затем вернись и снова нажми «Открыть».</p><div class="modal-actions"><button class="primary" data-action="join-channel">Открыть канал</button><button class="secondary" data-action="close-modal">Я подписался</button></div></div>');
 }
 function caseBonusHint(c) {
-  return c.free==='nickname' ? '<p class="case-bonus-hint">Добавь в имя Telegram <button class="info-link" data-action="copy-nickname">@BrainrotFreebie ⧉</button>, затем открой приложение заново.</p>' : '';
+  return c.free==='deposit' ? `<p class="case-bonus-hint">Подтверждённый депозит от 100 BStars даёт одно открытие. Доступно: ${state.bonuses?.depositCases || 0}.</p>` : c.free==='nickname' ? '<p class="case-bonus-hint">Добавь в имя Telegram <button class="info-link" data-action="copy-nickname">@BrainrotFreebie ⧉</button>, затем открой приложение заново.</p>' : '';
 }
 function sellAllDialog() {
   if(!state.inventory.length)return toast('Нет доступных предметов');
@@ -278,8 +286,8 @@ function renderSlots() {
     </div><section class="selection-panel slot-inventory"><div class="selection-title"><h2>Твой инвентарь</h2><span>${state.inventory.length} шт.</span></div>${state.inventory.length ? `<p class="slot-selection-note">Выбери один предмет для ставки</p><div class="item-grid">${state.inventory.map(entry=>itemCard(ITEM_BY_ID[entry.itemId],{action:'select-slot',id:entry.uid,selected:entry.uid===slotUid})).join('')}</div>` : inventoryEmpty(true)}</section></section>`;
 }
 function parseRoute() {
-  const hash = location.hash.slice(1);
-  return ['rocket','mines','admin','slots','upgrade','profile','cases','quests'].includes(hash) || (hash.startsWith('case/') && CASE_BY_ID[hash.slice(5)]) ? hash : 'cases';
+  const raw = location.hash.slice(1), hash=raw==='quests' ? 'bonuses' : raw;
+  return ['rocket','mines','admin','slots','upgrade','profile','cases','bonuses'].includes(hash) || (hash.startsWith('case/') && CASE_BY_ID[hash.slice(5)]) ? hash : 'cases';
 }
 function render({ scroll = false } = {}) {
   const pageScroll=window.scrollY, gridScroll=[...document.querySelectorAll('.item-grid')].map(g=>g.scrollTop);
@@ -291,7 +299,7 @@ function render({ scroll = false } = {}) {
   rocketUids=new Set([...rocketUids].filter(uid=>state.inventory.some(entry=>entry.uid===uid)));
   if (state.mines?.status==='active') mineCount=state.mines.bombCount;
   const rocketState=server ? {...state,rocket:sharedRocket(state)} : state;
-  $('#main').innerHTML = route.startsWith('case/') ? renderCase(CASE_BY_ID[route.slice(5)]) : route === 'upgrade' ? renderUpgrade() : route==='quests' ? renderQuests() : route === 'slots' ? renderSlots() : route==='rocket' ? renderRocket(rocketState,rocketUids,rocketAuto,rocketAutoTarget,{...featureUI,rocketAmount,server:!!server,now:server?.now}) : route==='mines' ? renderMines(state,mineUids,mineCount,featureUI) : route==='admin' ? server && !state.isAdmin ? '<div class="empty-state">Доступ запрещён</div>' : renderAdmin(state,playerName,{...featureUI,server:!!server}) : route === 'profile' ? renderProfile() : renderCases();
+  $('#main').innerHTML = route.startsWith('case/') ? renderCase(CASE_BY_ID[route.slice(5)]) : route === 'upgrade' ? renderUpgrade() : route==='bonuses' ? renderQuests() : route === 'slots' ? renderSlots() : route==='rocket' ? renderRocket(rocketState,rocketUids,rocketAuto,rocketAutoTarget,{...featureUI,rocketAmount,server:!!server,now:server?.now}) : route==='mines' ? renderMines(state,mineUids,mineCount,featureUI) : route==='admin' ? server && !state.isAdmin ? '<div class="empty-state">Доступ запрещён</div>' : renderAdmin(state,playerName,{...featureUI,server:!!server}) : route === 'profile' ? renderProfile() : renderCases();
   if (server && route==='profile') enhanceServerProfile();
   if(server) {
     if(state.gamesPaused) $('#main').insertAdjacentHTML('afterbegin','<p class="service-notice">Приём новых ставок приостановлен. Активные игры можно завершить.</p>');
@@ -335,14 +343,48 @@ function watchTicks(animation, count) {
   frameId = requestAnimationFrame(frame);
   return () => { stopped = true; cancelAnimationFrame(frameId); };
 }
+
+function beginWaitingSpin(element, update) {
+  let frame=0,progress=0,lastTick=-1,ended=false;
+  const started=performance.now();
+  const loop=now=>{
+    if(ended)return;
+    progress=update((now-started)/1000);
+    const tick=Math.floor(progress/12);
+    if(tick!==lastTick){lastTick=tick;sound.play('tick');}
+    frame=requestAnimationFrame(loop);
+  };
+  if(!reducedMotion.matches)frame=requestAnimationFrame(loop);
+  return ()=>{ended=true;cancelAnimationFrame(frame);return progress;};
+}
+function beginCaseWait(c) {
+  const track=$('.roulette-track');
+  const sequence=Array.from({length:Math.ceil(60/c.drops.length)},()=>shuffledBrainrots(c)).flat();
+  track.innerHTML=sequence.map(i=>itemCard(i,{eager:true})).join('');
+  const first=track.children[3],step=track.children[4].offsetLeft-first.offsetLeft;
+  const base=$('.roulette').clientWidth/2-first.offsetLeft-first.offsetWidth/2;
+  let offset=base;
+  const stop=beginWaitingSpin(track,t=>{
+    const shift=(t*5*step)%(step*12);offset=base-shift;
+    track.style.transform=`translateX(${offset}px)`;
+    return shift/step*12;
+  });
+  track.style.transform=`translateX(${base}px)`;
+  return ()=>{stop();return offset;};
+}
+
 async function openCase(caseId,count=1) {
   if (busy) return;
   const c=CASE_BY_ID[caseId];
   if (!c || ![1,3].includes(count) || c.free && count!==1) return;
   if(state.balance<c.price*count)return toast('Не хватает BStars. Пополни баланс в профиле.');
   const fast=fastMode || reducedMotion.matches;
-  const response=server ? await serverAction('case',{caseId,count}) : null;
-  if(server && !response)return;
+  setBusy(true);haptic('medium');
+  document.querySelectorAll('[data-action="open-case"]').forEach(button=>{button.disabled=true;button.textContent='Открываем…';});
+  const stopWaiting=beginCaseWait(c);
+  const response=server ? await serverAction('case',{caseId,count},true) : null;
+  const waitingOffset=stopWaiting();
+  if(server && !response){setBusy(false);render();return;}
   const drops=server ? response.result.drops || [response.result] : [];
   if(!server) {
     state.balance-=c.price*count;
@@ -356,12 +398,15 @@ async function openCase(caseId,count=1) {
   document.querySelectorAll('[data-action="open-case"]').forEach(button=>{button.disabled=true;button.textContent='Открываем…';});
   const track=$('.roulette-track');
   try {
-    for(const drop of drops) {
+    for(const [index,drop] of drops.entries()) {
       const item=ITEM_BY_ID[drop.itemId];
-      const sequence=Array.from({length:Math.ceil(44/c.drops.length)},()=>shuffledBrainrots(c)).flat();sequence[28]=item;
-      track.innerHTML=sequence.map(i=>itemCard(i,{eager:true})).join('');
+      if(index===0)track.children[28].outerHTML=itemCard(item,{eager:true});
+      else {
+        const sequence=Array.from({length:Math.ceil(44/c.drops.length)},()=>shuffledBrainrots(c)).flat();sequence[28]=item;
+        track.innerHTML=sequence.map(i=>itemCard(i,{eager:true})).join('');
+      }
       const first=track.children[3],winner=track.children[28],width=$('.roulette').clientWidth;
-      const start=width/2-first.offsetLeft-first.offsetWidth/2,end=width/2-winner.offsetLeft-winner.offsetWidth/2;
+      const start=index===0 ? waitingOffset : width/2-first.offsetLeft-first.offsetWidth/2,end=width/2-winner.offsetLeft-winner.offsetWidth/2;
       track.style.transform=`translateX(${start}px)`;
       let stopTicks=()=>{};
       try {
@@ -425,8 +470,15 @@ async function upgrade() {
   const source = getSource(), target = getTarget(); let chance = upgradeChance(source,target);
   if (!chance) return toast('Выбери исходный и желаемый предмет.');
   const stake = buildUpgradeStake(state.inventory, sourceUids); if (!stake.entries.length) return;
-  const response=server ? await serverAction('upgrade',{uids:[...sourceUids],targetId:target.id}) : null;
-  if (server && !response) return;
+  setBusy(true);haptic('medium');
+  $('.upgrade-circle').classList.add('spinning');$('.upgrade-machine').classList.add('running');
+  $('[data-action="upgrade"]').disabled=true;$('[data-action="upgrade"]').textContent='Апгрейдим…';
+  document.querySelectorAll('.quick-buttons button,.selection-panel button,.selection-panel input').forEach(el=>el.disabled=true);
+  const waitingPointer=$('.pointer-orbit');
+  const stopWaiting=beginWaitingSpin(waitingPointer,t=>{const angle=t*540;waitingPointer.style.transform=`rotate(${angle}deg)`;return angle;});
+  const response=server ? await serverAction('upgrade',{uids:[...sourceUids],targetId:target.id},true) : null;
+  const waitingAngle=stopWaiting();
+  if(server && !response){setBusy(false);render();return;}
   const landing = server ? response.result.landing : upgradeLanding(chance); const win = landing.win;
   if(server && Number.isFinite(response.result.chance)) chance=response.result.chance;
   if (!server) state.inventory = stake.remaining;
@@ -440,9 +492,9 @@ async function upgrade() {
   $('.upgrade-circle').classList.add('spinning'); $('.upgrade-machine').classList.add('running');
   $('[data-action="upgrade"]').disabled = true; $('[data-action="upgrade"]').textContent = 'Апгрейдим…';
   document.querySelectorAll('.quick-buttons button,.selection-panel button,.selection-panel input').forEach(el => el.disabled = true);
-  const pointer = $('.pointer-orbit'); const turns = 360 * 6 + landing.angle;
+  const pointer = $('.pointer-orbit'); const turns = waitingAngle + 360 * 6 + ((landing.angle-waitingAngle%360+360)%360);
   let stopTicks = () => {};
-  try { const animation = pointer.animate([{transform:'rotate(0deg)'},{transform:`rotate(${turns}deg)`}],{duration:fast ? 260 : 3900,easing:'cubic-bezier(.14,.65,.12,1)',fill:'forwards'}); stopTicks = watchTicks(animation,turns/12); await animation.finished; pointer.style.transform=`rotate(${turns}deg)`; animation.cancel(); } catch { pointer.style.transform=`rotate(${turns}deg)`; } finally { stopTicks(); }
+  try { const animation = pointer.animate([{transform:`rotate(${waitingAngle}deg)`},{transform:`rotate(${turns}deg)`}],{duration:fast ? 260 : 3900,easing:'cubic-bezier(.14,.65,.12,1)',fill:'forwards'}); stopTicks = watchTicks(animation,turns/12); await animation.finished; pointer.style.transform=`rotate(${turns}deg)`; animation.cancel(); } catch { pointer.style.transform=`rotate(${turns}deg)`; } finally { stopTicks(); }
   $('.upgrade-circle').classList.remove('spinning'); $('.upgrade-circle').classList.add('landing');
   cancelAnimationFrame(gaugeFrame);
   const exactLevel=Number.isFinite(landing.level) ? landing.level : liquidLevel(chance);
@@ -576,12 +628,12 @@ function adoptServerState(next) {
   next.history=[...merged.values()].map(e=>next.history.find(n=>n.id===e.id) || e).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt));
   state=next; server.state=next; server.offset=next.serverNow-Date.now(); persist();
 }
-async function serverAction(action,body) {
-  if (!server || server.locked || serverRequestPending || busy) return null;
+async function serverAction(action,body,animated=false) {
+  if (!server || server.locked || serverRequestPending || busy && !animated) return null;
   serverRequestPending=true; setBusy(true);
   try { const response=await server.mutate(action,body); adoptServerState(response.state); return response; }
   catch(error) {if(action==='case' && body.caseId==='subscribe' && error.message.includes('Подпишись'))subscriptionPrompt();else toast(error.message); return null;}
-  finally {serverRequestPending=false; setBusy(false);}
+  finally {serverRequestPending=false; if(!animated)setBusy(false);}
 }
 function canSelectRocket() { return server ? state.round && !state.round.ended && server.now()<state.round.startAt && state.rocket?.roundId!==state.round.id : !state.rocket || rocketFinished(state.rocket); }
 function runServerRocket() {
@@ -653,7 +705,7 @@ async function pollServer() {
         if(before.rocket?.status==='active' && state.rocket?.status!=='active' && state.rocket?.id===before.rocket.id) rocketResult();
         const financialChanged=JSON.stringify([before.inventory,before.balance,before.gamesPaused,before.debt,before.withdrawHeldUntil,before.refundReviewPending,before.pendingInventory,before.partner,before.withdrawalOpen])!==JSON.stringify([state.inventory,state.balance,state.gamesPaused,state.debt,state.withdrawHeldUntil,state.refundReviewPending,state.pendingInventory,state.partner,state.withdrawalOpen]);
         const flightChanged=JSON.stringify([before.round?.id,before.round?.ended,before.rocket?.status,before.mines])!==JSON.stringify([state.round?.id,state.round?.ended,state.rocket?.status,state.mines]);
-        const changed=financialChanged || activeRoute==='quests' && JSON.stringify(before.quests)!==JSON.stringify(state.quests) || activeRoute==='cases' && JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
+        const changed=financialChanged || activeRoute==='bonuses' && JSON.stringify([before.quests,before.bonuses])!==JSON.stringify([state.quests,state.bonuses]) || activeRoute==='cases' && JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
         const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday,before.maintenance])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday,state.maintenance]);
         if((changed || adminChanged) && !$('#modal').open) {
           const values=[...document.querySelectorAll('#main input')].filter(i=>i.name && i.form?.id).map(i=>({form:i.form.id,name:i.name,value:i.value}));
@@ -743,6 +795,8 @@ document.addEventListener('click', event => {
     case 'copy-nickname': navigator.clipboard.writeText('@BrainrotFreebie').then(()=>toast('Ник скопирован')).catch(()=>openModal('<div class="modal-content"><h2>Скопируй ник</h2><input readonly value="@BrainrotFreebie" aria-label="Ник для копирования"></div>'));break;
     case 'deposit-bot': {event.preventDefault();const url=button.href;if(tg?.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank','noopener');break;}
     case 'join-channel': {const url=server?.config?.newsUrl || 'https://t.me/brainrotFreebie';if(tg?.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank','noopener');break;}
+    case 'cashback-claim': void serverAction('cashback-claim',{}).then(r=>{if(r){render();toast('Кэшбэк +'+money(r.result.reward)+' BStars');}});break;
+    case 'giveaway-enter': void serverAction('giveaway-enter',{}).then(r=>{if(r){render();toast('Билет добавлен. Удачи!');}});break;
     case 'quest-claim': void serverAction('quest-claim',{questId:id}).then(r=>{if(r){render();toast('Награда +'+r.result.reward+' BStars');}});break;
     case 'sell-all': sellAllDialog();break;
     case 'confirm-sell-all': if(server)void serverAction('sale-all',{inventoryHash:id}).then(r=>{if(r){closeModal();render();toast('Продано '+r.result.count+' предметов');}});else {const value=state.inventory.reduce((sum,e)=>sum+ITEM_BY_ID[e.itemId].value,0);state.inventory=[];state.balance+=value;persist();closeModal();render();}break;

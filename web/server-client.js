@@ -13,7 +13,9 @@ export async function connectServer() {
   try {
     let token='';
     async function request(path,body,key) {
-      const response=await fetch(path,{method:body ? 'POST' : 'GET',headers:{'Content-Type':'application/json',...(token ? {Authorization:`Bearer ${token}`} : {}),...(key ? {'Idempotency-Key':key} : {})},...(body ? {body:JSON.stringify(body)} : {}),cache:'no-store'});
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+      let response;
+      try {response=await fetch(path,{signal:controller.signal,method:body ? 'POST' : 'GET',headers:{'Content-Type':'application/json',...(token ? {Authorization:`Bearer ${token}`} : {}),...(key ? {'Idempotency-Key':key} : {})},...(body ? {body:JSON.stringify(body)} : {}),cache:'no-store'});}catch(error){if(error.name==='AbortError'){const timeout=new Error('Сервер отвечает слишком долго. Попробуй ещё раз.');timeout.retryable=true;throw timeout;}throw error;}finally{clearTimeout(timer);}
       const data=await response.json();
       if (!response.ok) { if(response.status===401 || response.status===403 && path==='/api/auth') client.locked=true; if(data.detail?.code==='maintenance'){client.locked=true;client.maintenance=true;client.message=data.detail.message;} const error=new Error(typeof data.detail==='string' ? data.detail : data.detail?.message || 'Запрос отклонён'); error.retryable=response.status>=500; throw error; }
       return data;
