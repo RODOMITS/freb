@@ -9,6 +9,7 @@ import uvicorn
 
 
 def configure(root):
+    if os.name=='posix': os.umask(0o077)
     env_file=root/'.env'
     if env_file.exists():
         for line in env_file.read_text(encoding='utf-8-sig').splitlines():
@@ -40,4 +41,6 @@ if __name__=='__main__':
     os.chdir(project_root)
     configure(project_root)
     application=importlib.import_module('backend.app').app
-    uvicorn.run(application,host='0.0.0.0',port=int(os.getenv('PORT','8000')),workers=1,proxy_headers=True,forwarded_allow_ips=os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'))
+    if os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1').strip()=='*':
+        raise SystemExit('FORWARDED_ALLOW_IPS must list trusted proxy IPs/CIDRs, not *. Ask Bothost for the proxy address.')
+    uvicorn.run(application,host='0.0.0.0',port=int(os.getenv('PORT','8000')),workers=1,proxy_headers=True,forwarded_allow_ips=os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'),limit_concurrency=128,backlog=128,timeout_keep_alive=5,server_header=False)

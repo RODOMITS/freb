@@ -69,7 +69,12 @@ class Bonus160Tests(unittest.TestCase):
         with self.assertRaises(ValueError):self.call(200,'giveaway-enter')
 
     def test_daily_draw_awards_once_and_persists(self):
-        self.at(16,12);self.deposit(50);self.call(200,'giveaway-enter')
+        self.at(16,12)
+        # Runtime rounds are now prepared at startup; anchor this legacy daily scenario to Friday.
+        with self.s.store.tx() as db:
+            db.execute("DELETE FROM controls WHERE name='giveaway_weekly_from'")
+        self.s=type(self.s)('/virtual/release150.db',admins=(100,),clock=lambda:self.now)
+        self.deposit(50);self.call(200,'giveaway-enter')
         before=self.s.state(200);server_hash=before['bonuses']['giveaway']['serverHash']
         initial=len(before['inventory']);self.at(17,3)
         after=self.s.state(200)

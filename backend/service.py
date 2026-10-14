@@ -8,6 +8,7 @@ import time
 import threading
 import uuid
 import unicodedata
+from collections import OrderedDict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -39,7 +40,7 @@ class Service:
         self.store, self.admins, self.clock = Store(path), set(admins), clock
         self.limits=limits or Limits()
         self.starting_balance = cents(starting_balance)
-        self.presence={}
+        self.presence=OrderedDict()
         self.presence_lock=threading.Lock()
         catalog = json.loads(Path(__file__).with_name('catalog.json').read_text(encoding='utf-8'))
         self.items = {item['id']:item for item in catalog['items']}
@@ -72,11 +73,18 @@ class Service:
             distribution(case,self.items)
         with self.store.tx() as db:
             self.reconcile_giveaway_tickets(db)
+            self.ensure_runtime(db)
+            self.maintenance_jobs(db)
+            today=datetime.fromtimestamp(self.clock(),timezone(timedelta(hours=3))).strftime('%Y-%m-%d')
+            for drop in db.execute("SELECT id,detail FROM audit WHERE action='drop' AND drop_day IS NULL AND created>=?",(self.bonus_calendar(self.clock())['dayEnd']-86400,)).fetchall():
+                detail=json.loads(drop['detail']);item=self.items.get(detail.get('itemId'))
+                if item: db.execute('UPDATE audit SET drop_day=?,drop_value=? WHERE id=?',(today,item['value'],drop['id']))
 
     def login(self, user, start_param=""):
 
         uid, now = user['id'], self.clock()
         with self.store.tx() as db:
+            self.consume_rate(db,uid,'login',capacity=10,seconds=60)
             state = dict(version=1,balance=self.starting_balance,debt=0,inventory=[],stats=dict(opened=0,upgrades=0,wins=0),mines=None,rocket=None,slotResult=None)
             fresh=not db.execute('SELECT 1 FROM users WHERE id=?',(uid,)).fetchone()
             code='u'+str(uid)
@@ -183,7 +191,24 @@ class Service:
         label=datetime.fromtimestamp(start,timezone(timedelta(hours=3))).strftime('%Y-%m-%d')
         return dict(id='week:'+label,period='weekly',startAt=start,endAt=start+604800,transition=False)
 
-    def bonuses(self, db, uid):
+    def giveaway_counts(self, db, round_id, uid):
+        # Aggregate only this round, while retaining the same confirmed-source checks.
+        row=db.execute("""
+SELECT count(*) tickets,count(DISTINCT f.user_id) participants,coalesce(sum(f.user_id=?),0) mine
+FROM funding_bonuses f JOIN users u ON u.id=f.user_id
+LEFT JOIN transfers t ON t.id=f.id AND t.user_id=f.user_id AND t.kind='deposit' AND t.status='approved'
+LEFT JOIN invoices i ON i.id=f.id AND i.user_id=f.user_id AND i.status='paid'
+WHERE f.active=1 AND f.amount>=5000 AND f.giveaway_day=? AND (
+CASE WHEN json_valid(t.data) THEN
+CASE WHEN json_type(t.data,'$.value') IN ('integer','real')
+ AND json_extract(t.data,'$.value')>0 AND json_extract(t.data,'$.value')<92233720368547758.0
+ AND CAST(json_extract(t.data,'$.value')*100+.5 AS INTEGER)=f.amount THEN 1 ELSE 0 END
+ELSE 0 END
+OR (typeof(i.stars)='integer' AND i.stars>0 AND length(i.charge)>0 AND i.stars*150=f.amount))
+""",(uid,round_id)).fetchone()
+        return row['tickets'],row['mine'],row['participants']
+
+    def bonuses(self, db, uid, readonly=False):
         calendar=self.bonus_calendar(self.clock())
         rows=self.funded_bonus_rows(db,uid=uid)
         pending={r['id'] for r in db.execute("SELECT id FROM invoices WHERE user_id=? AND status='refund_requested'",(uid,))}
@@ -194,13 +219,13 @@ class Service:
         eligible=sum(1 for r in rows if r['amount']>=5000 and r['giveaway_day'] is None)
         period=self.giveaway_period(db)
         round_id=period['id']
-        seed=new_seed()
-        db.execute('INSERT OR IGNORE INTO giveaway_rounds(day,seed,commitment,period,start_at,end_at) VALUES(?,?,?,?,?,?)',(round_id,seed,commitment(seed),period['period'],period['startAt'],period['endAt']))
         round_=db.execute('SELECT commitment FROM giveaway_rounds WHERE day=?',(round_id,)).fetchone()
-        verified_tickets=self.funded_bonus_rows(db,minimum=5000,round_id=round_id)
-        tickets=len(verified_tickets)
-        mine=sum(1 for r in verified_tickets if r['user_id']==uid)
-        participants=len({r['user_id'] for r in verified_tickets})
+        if not round_:
+            if readonly: raise ValueError('Состояние розыгрыша обновляется. Повтори запрос.')
+            seed=new_seed()
+            db.execute('INSERT OR IGNORE INTO giveaway_rounds(day,seed,commitment,period,start_at,end_at) VALUES(?,?,?,?,?,?)',(round_id,seed,commitment(seed),period['period'],period['startAt'],period['endAt']))
+            round_=db.execute('SELECT commitment FROM giveaway_rounds WHERE day=?',(round_id,)).fetchone()
+        tickets,mine,participants=self.giveaway_counts(db,round_id,uid)
         last=db.execute('SELECT * FROM giveaway_draws ORDER BY created DESC,rowid DESC LIMIT 1').fetchone()
         return dict(weeklyDeposits=weekly/100,cashback=cashback/100,cashbackClaimed='cashback' in claimed,partnerClaimed='partner' in claimed,claimOpen=calendar['open'],nextClaimAt=calendar['nextOpen'],week=calendar['week'],depositCases=sum(1 for r in rows if r['amount']>=10000 and not r['case_used']),giveaway=dict(serverHash=round_['commitment'],day=round_id,period=period['period'],transition=period['transition'],drawAt=period['endAt']*1000,eligible=eligible,tickets=tickets,myTickets=mine,participants=participants,last=dict(day=last['day'].removeprefix('week:'),roundId=last['day'],winnerId=last['winner'],participants=last['participants'],serverSeed=last['seed'],serverHash=last['commitment']) if last else None))
 
@@ -231,14 +256,17 @@ class Service:
         if funded and db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone():
             db.execute('INSERT OR IGNORE INTO referral_ledger(event_id,invitee,net,stake,payout,created) VALUES(?,?,?,?,?,?)',(event_id,uid,cents(stake)-cents(payout),cents(stake),cents(payout),self.clock()))
 
-    def partner(self, db, uid):
+    def partner(self, db, uid, readonly=False):
         account=db.execute('SELECT * FROM partners WHERE user_id=?',(uid,)).fetchone()
         if not account:
+            if readonly: raise ValueError('Открой приложение заново, чтобы обновить профиль.')
             code='u'+str(uid)
             db.execute('INSERT INTO partners(user_id,code) VALUES(?,?)',(uid,code))
             db.execute('INSERT OR IGNORE INTO referral_codes VALUES(?,?)',(code,uid))
             account=db.execute('SELECT * FROM partners WHERE user_id=?',(uid,)).fetchone()
         people=db.execute('SELECT r.invitee,r.created,u.profile FROM referrals r JOIN users u ON u.id=r.invitee WHERE r.inviter=? ORDER BY r.created DESC',(uid,)).fetchall()
+        if not people and account['claimed']==0:
+            return dict(code=account['code'],count=0,revShare=40,nextTier=dict(count=25,rate=45),earned=0,claimed=account['claimed']/100,available=0,availableCents=0,deposits=0,depositCount=0,depositors=0,turnover=0,payouts=0,games=0,historyComplete=True,netRevenue=0,negativeCarry=0,pending=0,withdrawn=0,claimedOnBalance=account['claimed']/100,referrals=[])
         paid={r['user_id']:dict(amount=r['amount'],count=r['count']) for r in db.execute("SELECT user_id,sum(stars)*150 amount,count(*) count FROM invoices WHERE status='paid' AND user_id IN (SELECT invitee FROM referrals WHERE inviter=?) GROUP BY user_id",(uid,))}
         for r in db.execute("SELECT user_id,data FROM transfers WHERE kind='deposit' AND status='approved' AND user_id IN (SELECT invitee FROM referrals WHERE inviter=?)",(uid,)):
             entry=paid.setdefault(r['user_id'],dict(amount=0,count=0))
@@ -301,16 +329,28 @@ class Service:
         return (amount*15+50)//100 if db.execute('SELECT 1 FROM referrals WHERE invitee=?',(uid,)).fetchone() else 0
 
     def maintenance(self):
-        with self.store.tx() as db:
+        with self.store.read() as db:
             row=db.execute("SELECT value FROM controls WHERE name='maintenance'").fetchone()
             return bool(row and row['value'])
 
+    def authenticated_user(self, token):
+        if not isinstance(token,str) or not re.fullmatch(r'[A-Za-z0-9_-]{32,128}',token):
+            raise PermissionError('Некорректная сессия. Открой приложение в Telegram.')
+        with self.store.read() as db:
+            row=db.execute("SELECT s.user_id,coalesce(c.value,0) maintenance FROM sessions s LEFT JOIN controls c ON c.name='maintenance' WHERE s.token=? AND s.expires>?",(hashlib.sha256(token.encode()).hexdigest(),self.clock())).fetchone()
+        if not row: raise PermissionError('Сессия истекла. Открой приложение заново в Telegram.')
+        return row['user_id'],bool(row['maintenance'])
+
     def authenticate(self, token):
-        with self.store.tx() as db:
-            row = db.execute('SELECT user_id FROM sessions WHERE token=? AND expires>?',(hashlib.sha256(token.encode()).hexdigest(),self.clock())).fetchone()
-        if not row:
-            raise PermissionError('Сессия истекла. Открой приложение заново в Telegram.')
-        return row['user_id']
+        return self.authenticated_user(token)[0]
+
+    def consume_rate(self, db, uid, kind, capacity=60, seconds=30):
+        from .security import RateLimited
+        now=self.clock()
+        row=db.execute('SELECT tokens,updated FROM account_rates WHERE user_id=? AND kind=?',(uid,kind)).fetchone()
+        tokens=min(capacity,row['tokens']+max(0,now-row['updated'])*capacity/seconds) if row else capacity
+        if tokens<1: raise RateLimited(max(1,math.ceil((1-tokens)*seconds/capacity)))
+        db.execute('INSERT INTO account_rates VALUES(?,?,?,?) ON CONFLICT(user_id,kind) DO UPDATE SET tokens=excluded.tokens,updated=excluded.updated',(uid,kind,tokens-1,now))
 
     def operation(self, db, uid, kind, title, status='done', delta=0, detail='', proof=None, op_id=None):
         op_id = op_id or ident()
@@ -329,10 +369,11 @@ class Service:
     def stake(self, state, uids):
         if not isinstance(uids,list) or not uids or any(not isinstance(u,str) for u in uids) or len(set(uids)) != len(uids):
             raise ValueError('Выбери хотя бы один доступный предмет')
-        entries = [e for e in state['inventory'] if e['uid'] in uids]
+        selected=set(uids)
+        entries = [e for e in state['inventory'] if e['uid'] in selected]
         if len(entries) != len(uids):
             raise ValueError('Предмет недоступен или уже поставлен')
-        state['inventory'] = [e for e in state['inventory'] if e['uid'] not in uids]
+        state['inventory'] = [e for e in state['inventory'] if e['uid'] not in selected]
         return sum(self.items[e['itemId']]['value'] for e in entries), entries
 
     def credit(self, state, amount):
@@ -376,10 +417,10 @@ class Service:
         state['inventory'].append(entry)
         return entry['uid']
 
-    def current_round(self, db):
+    def current_round(self, db, create=True):
         row = db.execute('SELECT data FROM rounds ORDER BY rowid DESC LIMIT 1').fetchone()
         game = json.loads(row['data']) if row else None
-        if game is None or self.clock() >= game['endAt']/1000+3:
+        if create and (game is None or self.clock() >= game['endAt']/1000+3):
             seed, round_id = new_seed(), ident()
             crash = crash_point(FairRandom(seed,round_id,0).draw())
             start = (self.clock()+10)*1000
@@ -387,11 +428,48 @@ class Service:
             db.execute('INSERT INTO rounds VALUES(?,?)',(round_id,json.dumps(game)))
         return game
 
+    def ensure_runtime(self, db):
+        period=self.giveaway_period(db)
+        if not db.execute('SELECT 1 FROM giveaway_rounds WHERE day=?',(period['id'],)).fetchone():
+            seed=new_seed()
+            db.execute('INSERT INTO giveaway_rounds(day,seed,commitment,period,start_at,end_at) VALUES(?,?,?,?,?,?)',(period['id'],seed,commitment(seed),period['period'],period['startAt'],period['endAt']))
+        self.current_round(db)
+
+    def maintenance_jobs(self, db):
+        now=self.clock()
+        row=db.execute("SELECT value FROM controls WHERE name='maintenance_next'").fetchone()
+        if row and row['value']>now: return
+        db.execute('DELETE FROM sessions WHERE token IN (SELECT token FROM sessions WHERE expires<=? LIMIT 1000)',(now,))
+        # Retain idempotency keys forever; compact old snapshots without replaying a wager.
+        for row in db.execute("SELECT user_id,key,response FROM requests WHERE length(response)>2048 AND json_valid(response) AND json_type(response,'$.state')='object' LIMIT 20").fetchall():
+            receipt=json.loads(row['response'])
+            db.execute('UPDATE requests SET response=? WHERE user_id=? AND key=?',(json.dumps(dict(result=receipt.get('result'))),row['user_id'],row['key']))
+        db.execute("INSERT INTO controls VALUES('maintenance_next',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",(int(now+300),))
+
+    def needs_tick(self, db):
+        now=self.clock()
+        maintenance=db.execute("SELECT value FROM controls WHERE name='maintenance_next'").fetchone()
+        if not maintenance or maintenance['value']<=now: return True
+        if db.execute('SELECT 1 FROM users WHERE next_tick<=? LIMIT 1',(now,)).fetchone(): return True
+        game=self.current_round(db,create=False)
+        if game is None or now>=game['endAt']/1000+3: return True
+        period=self.giveaway_period(db)
+        if not db.execute('SELECT 1 FROM giveaway_rounds WHERE day=?',(period['id'],)).fetchone(): return True
+        return bool(db.execute("SELECT 1 FROM giveaway_rounds r WHERE r.end_at<=? AND NOT EXISTS(SELECT 1 FROM giveaway_draws d WHERE d.day=r.day) AND EXISTS(SELECT 1 FROM funding_bonuses f WHERE f.giveaway_day=r.day) LIMIT 1",(now,)).fetchone())
+
+    def refresh_runtime(self):
+        with self.store.read() as db:
+            due=self.needs_tick(db)
+        if due:
+            with self.store.tx() as db:
+                if self.needs_tick(db): self.tick(db)
+
     def tick(self, db):
+        self.maintenance_jobs(db)
         self.draw_giveaways(db)
         now = self.clock()*1000
         # Settle stored wagers before rotating the public round, including after restart.
-        for row in db.execute('SELECT id,state FROM users').fetchall():
+        for row in db.execute('SELECT id,state FROM users WHERE next_tick<=?',(now/1000,)).fetchall():
             state, changed = json.loads(row['state']), False
             mines = state.get('mines')
             if mines and mines['status']=='active' and now>=mines['expiresAt']:
@@ -409,7 +487,7 @@ class Service:
                     changed = True
             if changed:
                 save_user(db,row['id'],state)
-        self.current_round(db)
+        self.ensure_runtime(db)
 
     def finish_mines(self, db, uid, state, win, reason=''):
         game = state['mines']
@@ -431,28 +509,33 @@ class Service:
     def online_count(self, uid):
         now=self.clock()
         with self.presence_lock:
+            if not isinstance(self.presence,OrderedDict): self.presence=OrderedDict(self.presence)
             self.presence[uid]=now
-            self.presence={user:seen for user,seen in self.presence.items() if seen>now-60}
+            self.presence.move_to_end(uid)
+            while self.presence:
+                who,seen=next(iter(self.presence.items()))
+                if seen>now-60: break
+                self.presence.pop(who)
             return len(self.presence)
 
-    def snapshot(self, db, uid, history_limit=200):
+    def snapshot(self, db, uid, history_limit=200, readonly=False):
         row, state = load_user(db,uid)
         result = copy.deepcopy(state)
         result.update(self.account_lock(db,uid))
         result['onlineCount']=self.online_count(uid)
         result['balance'] /= 100
         result['quests']=self.quests(db,uid)
-        result['bonuses']=self.bonuses(db,uid)
+        result['bonuses']=self.bonuses(db,uid,readonly=readonly)
         result['inventoryHash']=hashlib.sha256(','.join(sorted(e['uid'] for e in state['inventory'])).encode()).hexdigest()
-        result['partner']=self.partner(db,uid)
+        result['partner']=self.partner(db,uid,readonly=readonly)
         parent=db.execute('SELECT p.code FROM referrals r JOIN partners p ON p.user_id=r.inviter WHERE r.invitee=?',(uid,)).fetchone()
         result['referrerCode']=parent['code'] if parent else None
         result['partner'].pop('availableCents',None)
         result['withdrawalOpen']=self.withdrawal_open(self.clock())
         result['pendingInventory']=[dict(e,requestId=r['id'],status='withdrawing') for r in db.execute("SELECT id,data FROM transfers WHERE user_id=? AND kind='withdraw' AND status='pending'",(uid,)) for e in json.loads(r['data'])['entries']]
-        today=datetime.fromtimestamp(self.clock(),timezone(timedelta(hours=3))).replace(hour=0,minute=0,second=0,microsecond=0).timestamp()
-        drops=[dict(json.loads(r['detail']),created=r['created']) for r in db.execute("SELECT detail,created FROM audit WHERE action='drop' AND created>=?",(today,))]
-        result['topDrop']=max(drops,key=lambda d:self.items.get(d['itemId'],{}).get('value',0)) if drops else None
+        today=datetime.fromtimestamp(self.clock(),timezone(timedelta(hours=3))).strftime('%Y-%m-%d')
+        top=db.execute("SELECT detail,created FROM audit WHERE action='drop' AND drop_day=? ORDER BY drop_value DESC,created,id LIMIT 1",(today,)).fetchone()
+        result['topDrop']=dict(json.loads(top['detail']),created=top['created']) if top else None
         result['debt']=state.get('debt',0)/100
         result['withdrawHeldUntil']=self.withdraw_hold(db,uid)*1000
         result['refundReviewPending']=bool(db.execute("SELECT 1 FROM invoices WHERE user_id=? AND status='refund_requested'",(uid,)).fetchone())
@@ -476,7 +559,7 @@ class Service:
         result['freeClaims'] = {r['case_id']:r['claimed']*1000 for r in db.execute('SELECT * FROM claims WHERE user_id=?',(uid,))}
         if result['mines'] and result['mines']['status']=='active':
             result['mines']['bombs'] = []
-        round_ = self.current_round(db)
+        round_ = self.current_round(db,create=not readonly)
         public_round = {k:v for k,v in round_.items() if k not in ('seed','crash','endAt','capped')}
         public_round['ended'] = self.clock()*1000 >= round_['endAt']
         if public_round['ended']:
@@ -493,16 +576,20 @@ class Service:
             spent=db.execute('SELECT spent FROM bonus_spend WHERE day=?',(day,)).fetchone()
             result['bonusSpentToday']=(spent['spent']/100) if spent else 0
             result['transfers'] = [dict(id=r['id'],userId=r['user_id'],kind=r['kind'],status=r['status'],data=json.loads(r['data'])) for r in db.execute("SELECT * FROM transfers ORDER BY created DESC LIMIT 100")]
-            result['users'] = [dict(id=r['id'],name=json.loads(r['profile']).get('first_name','Игрок'),balance=json.loads(r['state'])['balance']/100,**self.account_lock(db,r['id'])) for r in db.execute('SELECT id,profile,state FROM users ORDER BY EXISTS(SELECT 1 FROM account_locks l WHERE l.user_id=users.id AND (l.balance_frozen=1 OR l.withdrawal_frozen=1)) DESC,id LIMIT 100')]
+            result['users'] = [dict(id=r['id'],name=json.loads(r['profile']).get('first_name','Игрок'),balance=json.loads(r['state'])['balance']/100,balanceFrozen=bool(r['balance_frozen']),withdrawalFrozen=bool(r['withdrawal_frozen']),freezeReason=r['reason'] or '') for r in db.execute('SELECT u.id,u.profile,u.state,l.balance_frozen,l.withdrawal_frozen,l.reason FROM users u LEFT JOIN account_locks l ON l.user_id=u.id ORDER BY (coalesce(l.balance_frozen,0) OR coalesce(l.withdrawal_frozen,0)) DESC,u.id LIMIT 100')]
         else:
             result['transfers'] = [dict(id=r['id'],kind=r['kind'],status=r['status'],data=json.loads(r['data'])) for r in db.execute('SELECT * FROM transfers WHERE user_id=? ORDER BY created DESC LIMIT 100',(uid,))]
         result['serverNow'] = self.clock()*1000
         return result
 
     def state(self, uid, limit=200):
+        with self.store.read() as db:
+            if not self.needs_tick(db):
+                return self.snapshot(db,uid,min(200,max(20,limit)),readonly=True)
+        # Only due settlements or round transitions require a writer.
         with self.store.tx() as db:
             self.tick(db)
-            return self.snapshot(db,uid,limit)
+            return self.snapshot(db,uid,min(200,max(20,limit)))
 
     def mutate(self, uid, action, body, key):
         if action.startswith('admin-') and uid not in self.admins:
@@ -521,13 +608,16 @@ class Service:
             if cached:
                 if cached['fingerprint'] != fingerprint:
                     raise ValueError('Ключ уже использован для другой операции')
-                return json.loads(cached['response'])
+                prior=json.loads(cached['response'])
+                # Keep the exact operation result, but never restore a stale balance/freeze state.
+                return dict(state=self.snapshot(db,uid),result=prior.get('result'))
+            self.consume_rate(db,uid,'action')
             self.tick(db)
             _,state = load_user(db,uid)
             data = self.execute(db,uid,state,action,body)
             save_user(db,uid,state)
             response = dict(state=self.snapshot(db,uid),result=data)
-            db.execute('INSERT INTO requests VALUES(?,?,?,?,?)',(uid,key,fingerprint,json.dumps(response),self.clock()))
+            db.execute('INSERT INTO requests VALUES(?,?,?,?,?)',(uid,key,fingerprint,json.dumps(dict(result=data)),self.clock()))
             return response
 
     def drop(self, db, uid, item_id):
@@ -536,7 +626,10 @@ class Service:
         self.audit(db,uid,'drop',dict(itemId=item_id,playerName=profile.get('first_name','Игрок')))
 
     def audit(self, db, uid, action, detail):
-        db.execute('INSERT INTO audit(actor,action,detail,created) VALUES(?,?,?,?)',(uid,action,json.dumps(detail),self.clock()))
+        now=self.clock()
+        day=datetime.fromtimestamp(now,timezone(timedelta(hours=3))).strftime('%Y-%m-%d') if action=='drop' else None
+        value=self.items.get(detail.get('itemId'),{}).get('value') if action=='drop' else None
+        db.execute('INSERT INTO audit(actor,action,detail,created,drop_day,drop_value) VALUES(?,?,?,?,?,?)',(uid,action,json.dumps(detail),now,day,value))
 
     def execute(self, db, uid, state, action, b):
         now = self.clock()
