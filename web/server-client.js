@@ -1,9 +1,8 @@
 export async function connectServer() {
   let config;
-  const localDemo=['localhost','127.0.0.1'].includes(location.hostname) && location.port==='5173';
   try {
     const response=await fetch('/runtime-config',{cache:'no-store'});
-    if (!response.ok) return localDemo ? null : {locked:true,message:'Сервер приложения недоступен.'};
+    if (!response.ok) return {locked:true,message:'Сервер приложения недоступен.'};
     config=await response.json();
     if (config.mode!=='server') return localDemo ? null : {locked:true,message:'Открой приложение через Telegram.'};
   } catch { return {locked:true,message:'Сервер недоступен. Попробуй открыть приложение позже.'}; }

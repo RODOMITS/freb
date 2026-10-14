@@ -1,4 +1,4 @@
-import { SETTINGS, ITEMS, ITEM_BY_ID, CASES, CASE_BY_ID, RARITIES } from './config.js';
+import { SETTINGS, ITEMS, ITEM_BY_ID, CASES, CASE_BY_ID, RARITIES, applyCatalog } from './config.js';
 import { distribution, rollCase, randomUnit, upgradeChance, buildUpgradeStake, liquidLevel, upgradeLanding, legacyUpgradeLanding, settleSlots, newState, validateState, recordOperation, createPromo, redeemPromo, togglePromo, adjustBalance, startMines, revealMine, cashMines } from './engine.js';
 import { SoundEngine } from './audio.js';
 import { renderMines, renderHistory, renderAdmin, renderRocket, rocketGeometry } from './feature-views.js';
@@ -6,12 +6,9 @@ import { startRocket, advanceRocket, cashRocket, rocketValue, rocketFinished, ro
 import { connectServer, sharedRocket, verifyProof } from './server-client.js';
 
 const server = await connectServer();
-if (server?.catalog) {
-  SETTINGS.rtp=server.config.rtp || .80;
-  ITEMS.splice(0,ITEMS.length,...server.catalog.items);
-  Object.keys(ITEM_BY_ID).forEach(id=>delete ITEM_BY_ID[id]); Object.assign(ITEM_BY_ID,Object.fromEntries(ITEMS.map(i=>[i.id,i])));
-  CASES.splice(0,CASES.length,...server.catalog.cases);
-  Object.keys(CASE_BY_ID).forEach(id=>delete CASE_BY_ID[id]); Object.assign(CASE_BY_ID,Object.fromEntries(CASES.map(c=>[c.id,c])));
+if (!server.locked) {
+  try { applyCatalog(server.catalog); }
+  catch(error) { server.locked=true;server.message=error.message; }
 }
 
 const $ = (selector) => document.querySelector(selector);
@@ -122,7 +119,7 @@ function itemCard(item, options = {}) {
     <img src="${item.image}" alt="${esc(item.name)}" loading="${eager ? 'eager' : 'lazy'}" draggable="false"><span class="item-name">${esc(item.name)}</span><span class="item-value"><span class="coin">✦</span>${money(item.value)}</span>${sale ? '<span class="sell-hint">Нажми, чтобы продать</span>' : ''}
   </${tag}>`;
 }
-const previewFeed = ['67', 'venuspino', 'dragon', 'burguro', 'garama', 'ketupatbro', 'cerberus'].map(itemId => ({ itemId, preview: true }));
+const previewFeed = [];
 function feedMarkup() {
   return `<section class="live-section" aria-label="Последние дропы"><div class="live-heading"><span class="live-dot"></span>Последние дропы</div><div class="live-track">${[...state.feed, ...(server ? [] : previewFeed)].slice(0, 12).map(drop => {
     const item = ITEM_BY_ID[drop.itemId];
@@ -274,7 +271,7 @@ function renderSlots() {
   if (!bet) slotUid = null;
   const item = bet && ITEM_BY_ID[bet.itemId];
   const last = state.slotResult;
-  const symbols = last?.symbols || ['67','bananito','foxini'];
+  const symbols = last?.symbols || Array.from({length:3},(_,i)=>ITEMS[i%ITEMS.length].id);
   return `<div class="compact-head"><h1>Слоты</h1></div><section class="slots-layout"><div class="slots-cabinet ${last?.multiplier ? 'has-win' : ''}">
     <div class="slots-topline">${icon('slots')}<span>3 БАРАБАНА</span><span class="slots-indicator"></span></div>
     <div class="slots-reels" aria-label="Три барабана слотов">${symbols.map((id,index)=>`<div class="slot-window"><div class="slot-track" data-reel="${index}">${slotSymbol(id)}</div></div>`).join('')}<div class="slots-payline" aria-hidden="true"></div></div>
@@ -737,7 +734,7 @@ async function showProof(id) {
       const draws=checked.draws; let result;
       if(proof.game==='case') { if(proof.table) {let cumulative=0;result=proof.table.find(d=>(cumulative+=d.chance)>draws[0])?.itemId || proof.table.at(-1).itemId;} else result=rollCase(CASE_BY_ID[proof.caseId],draws[0]); }
       else if(proof.game==='upgrade') result=(proof.geometry==='arrow' ? upgradeLanding : legacyUpgradeLanding)(proof.chance,draws[0],draws[1]);
-      else if(proof.game==='slots') {let cursor=1;result=rollSlots(1,draws[0],()=>draws[cursor++],{tripleChance:.03,pairChance:((proof.rtp || .85)-.15)/2},proof.itemIds || ["67", "lagrand", "bananito", "esok", "ketupat", "tictac", "lavadorito", "garama", "eviledon", "cash", "pizza", "burguro", "capitano", "cerberus", "pegasus", "guest666", "cookie", "fortunu", "ketupatbro", "foxini", "venuspino", "dragon"]).symbols;}
+      else if(proof.game==='slots') {let cursor=1;result=rollSlots(1,draws[0],()=>draws[cursor++],{tripleChance:.03,pairChance:((proof.rtp || .85)-.15)/2},proof.itemIds || ITEMS.map(i=>i.id)).symbols;}
       else if(proof.game==='mines') {const pool=Array.from({length:25},(_,i)=>i);result=Array.from({length:proof.bombCount},(_,i)=>pool.splice(Math.floor(draws[i]*pool.length),1)[0]);}
       else result=Math.min(100,draws[0]<(1-(proof.rtp || .85)) ? 1 : (proof.rtp || .85)/(1-draws[0]));
       const match=proof.game==='upgrade' ? expected && expected.win===result.win && Math.abs(expected.x-result.x)<1e-8 && Math.abs(expected.y-result.y)<1e-8 : proof.game==='rocket' ? Math.abs(expected-result)<1e-8 : JSON.stringify(expected)===JSON.stringify(result);
