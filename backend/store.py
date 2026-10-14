@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, actor INT
 CREATE TABLE IF NOT EXISTS bonus_spend(day TEXT PRIMARY KEY, spent INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS refund_jobs(invoice_id TEXT PRIMARY KEY, status TEXT NOT NULL, actor INTEGER NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS controls(name TEXT PRIMARY KEY, value INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS account_locks(user_id INTEGER PRIMARY KEY, balance_frozen INTEGER NOT NULL DEFAULT 0, withdrawal_frozen INTEGER NOT NULL DEFAULT 0, reason TEXT NOT NULL DEFAULT '', actor INTEGER NOT NULL DEFAULT 0, updated REAL NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS partners(user_id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, claimed INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS referral_codes(code TEXT PRIMARY KEY, user_id INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS referrals(invitee INTEGER PRIMARY KEY, inviter INTEGER NOT NULL, created REAL NOT NULL);
@@ -75,7 +76,12 @@ class Store:
                 if name not in giveaway_columns:
                     db.execute(f'ALTER TABLE giveaway_rounds ADD COLUMN {name} {kind}')
             db.execute("UPDATE giveaway_rounds SET end_at=CAST(strftime('%s',day,'+1 day','-3 hours') AS INTEGER),start_at=CAST(strftime('%s',day,'-3 hours') AS INTEGER) WHERE end_at IS NULL AND day GLOB '????-??-??'")
-            db.execute('PRAGMA user_version=10')
+            # Apply the requested incident hold once; later admin unfreezes survive restarts.
+            if not db.execute("SELECT 1 FROM controls WHERE name='incident_hold_20261014'").fetchone():
+                for uid in (7221165756,6263182915):
+                    db.execute("INSERT INTO account_locks(user_id,balance_frozen,withdrawal_frozen,reason) VALUES(?,1,1,'Проверка депозита') ON CONFLICT(user_id) DO UPDATE SET balance_frozen=1,withdrawal_frozen=1,reason=excluded.reason",(uid,))
+                db.execute("INSERT INTO controls VALUES('incident_hold_20261014',1)")
+            db.execute('PRAGMA user_version=11')
 
 
     def backup(self, directory):
