@@ -1,16 +1,16 @@
 import unittest
 from datetime import datetime, timezone
-from tests.test_v150 import Release150Tests
+from tests import test_v150 as fixtures
 from backend.service import ident
 from backend.store import load_user, save_user
 from backend.economy import distribution
 from backend.fair import commitment
 
 class Bonus160Tests(unittest.TestCase):
-    setUp=Release150Tests.setUp
-    tearDown=Release150Tests.tearDown
-    call=Release150Tests.call
-    add=Release150Tests.add
+    setUp=fixtures.Release150Tests.setUp
+    tearDown=fixtures.Release150Tests.tearDown
+    call=fixtures.Release150Tests.call
+    add=fixtures.Release150Tests.add
 
     def at(self,day,hour,minute=0):
         # October 17, 2026 is Saturday. Moscow is UTC+3.
