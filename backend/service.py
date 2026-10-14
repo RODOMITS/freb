@@ -70,6 +70,8 @@ class Service:
         self.cases={key:case for key,case in self.cases.items() if key in ('deposit','allornothing') or (web_root/case['image']).is_file()}
         for case in self.cases.values():
             distribution(case,self.items)
+        with self.store.tx() as db:
+            self.reconcile_giveaway_tickets(db)
 
     def login(self, user, start_param=""):
 
@@ -105,6 +107,38 @@ class Service:
         saturday=monday+timedelta(days=5,hours=10)
         return dict(day=day.strftime('%Y-%m-%d'),week=monday.strftime('%Y-%m-%d'),weekStart=monday.timestamp(),dayEnd=(day+timedelta(days=1)).timestamp(),open=msk.weekday()==5 and 10<=msk.hour<20,nextOpen=(saturday if msk<saturday else saturday+timedelta(days=7)).timestamp()*1000)
 
+
+    def funded_bonus_rows(self, db, uid=None, minimum=1, round_id=None, unassigned=False):
+        filters=['f.active=1','f.amount>=?'];params=[minimum]
+        if uid is not None:filters.append('f.user_id=?');params.append(uid)
+        if round_id is not None:filters.append('f.giveaway_day=?');params.append(round_id)
+        if unassigned:filters.append('f.giveaway_day IS NULL')
+        rows=db.execute("SELECT f.*,t.data source_transfer,i.stars source_stars,i.charge source_charge FROM funding_bonuses f JOIN users u ON u.id=f.user_id LEFT JOIN transfers t ON t.id=f.id AND t.user_id=f.user_id AND t.kind='deposit' AND t.status='approved' LEFT JOIN invoices i ON i.id=f.id AND i.user_id=f.user_id AND i.status='paid' WHERE "+' AND '.join(filters)+" ORDER BY f.created,f.id",params).fetchall()
+        verified=[]
+        for row in rows:
+            transfer_ok=False
+            if row['source_transfer'] is not None:
+                try:
+                    value=json.loads(row['source_transfer'])['value']
+                    transfer_ok=type(value) in (int,float) and math.isfinite(value) and value>0 and cents(value)==row['amount']
+                except (ValueError,TypeError,KeyError,OverflowError):pass
+            stars_ok=type(row['source_stars']) is int and row['source_stars']>0 and bool(row['source_charge']) and row['source_stars']*150==row['amount']
+            if transfer_ok or stars_ok:verified.append(row)
+        return verified
+
+    def reconcile_giveaway_tickets(self, db):
+        pending=db.execute("SELECT id,user_id,giveaway_day FROM funding_bonuses WHERE giveaway_day IS NOT NULL AND NOT EXISTS (SELECT 1 FROM giveaway_draws WHERE day=funding_bonuses.giveaway_day)").fetchall()
+        valid=set()
+        for round_id in {r['giveaway_day'] for r in pending}:
+            valid.update(r['id'] for r in self.funded_bonus_rows(db,minimum=5000,round_id=round_id))
+        removed=0
+        for ticket in pending:
+            if ticket['id'] in valid:continue
+            db.execute('UPDATE funding_bonuses SET giveaway_day=NULL WHERE id=?',(ticket['id'],))
+            self.audit(db,ticket['user_id'],'giveaway-disqualified',dict(fundingId=ticket['id'],roundId=ticket['giveaway_day'],reason='Нет подтверждённого пополнения от 50 BStars'))
+            removed+=1
+        return removed
+
     def register_funding(self, db, uid, funding_id, amount):
         # Principal only: referral boosts and administrator credits are excluded.
         db.execute('INSERT OR IGNORE INTO funding_bonuses(id,user_id,amount,created) VALUES(?,?,?,?)',(funding_id,uid,amount,self.clock()))
@@ -138,7 +172,7 @@ class Service:
 
     def bonuses(self, db, uid):
         calendar=self.bonus_calendar(self.clock())
-        rows=db.execute('SELECT * FROM funding_bonuses WHERE user_id=? AND active=1',(uid,)).fetchall()
+        rows=self.funded_bonus_rows(db,uid=uid)
         pending={r['id'] for r in db.execute("SELECT id FROM invoices WHERE user_id=? AND status='refund_requested'",(uid,))}
         rows=[r for r in rows if r['id'] not in pending]
         claimed={r['kind'] for r in db.execute('SELECT kind FROM weekly_bonus_claims WHERE user_id=? AND week=?',(uid,calendar['week']))}
@@ -150,9 +184,10 @@ class Service:
         seed=new_seed()
         db.execute('INSERT OR IGNORE INTO giveaway_rounds(day,seed,commitment,period,start_at,end_at) VALUES(?,?,?,?,?,?)',(round_id,seed,commitment(seed),period['period'],period['startAt'],period['endAt']))
         round_=db.execute('SELECT commitment FROM giveaway_rounds WHERE day=?',(round_id,)).fetchone()
-        tickets=db.execute('SELECT count(*) FROM funding_bonuses WHERE active=1 AND giveaway_day=?',(round_id,)).fetchone()[0]
-        mine=db.execute('SELECT count(*) FROM funding_bonuses WHERE user_id=? AND active=1 AND giveaway_day=?',(uid,round_id)).fetchone()[0]
-        participants=db.execute('SELECT count(DISTINCT user_id) FROM funding_bonuses WHERE active=1 AND giveaway_day=?',(round_id,)).fetchone()[0]
+        verified_tickets=self.funded_bonus_rows(db,minimum=5000,round_id=round_id)
+        tickets=len(verified_tickets)
+        mine=sum(1 for r in verified_tickets if r['user_id']==uid)
+        participants=len({r['user_id'] for r in verified_tickets})
         last=db.execute('SELECT * FROM giveaway_draws ORDER BY created DESC,rowid DESC LIMIT 1').fetchone()
         return dict(weeklyDeposits=weekly/100,cashback=cashback/100,cashbackClaimed='cashback' in claimed,partnerClaimed='partner' in claimed,claimOpen=calendar['open'],nextClaimAt=calendar['nextOpen'],week=calendar['week'],depositCases=sum(1 for r in rows if r['amount']>=10000 and not r['case_used']),giveaway=dict(serverHash=round_['commitment'],day=round_id,period=period['period'],transition=period['transition'],drawAt=period['endAt']*1000,eligible=eligible,tickets=tickets,myTickets=mine,participants=participants,last=dict(day=last['day'].removeprefix('week:'),roundId=last['day'],winnerId=last['winner'],participants=last['participants'],serverSeed=last['seed'],serverHash=last['commitment']) if last else None))
 
@@ -166,7 +201,7 @@ class Service:
                 deadline=datetime.fromisoformat(day).replace(tzinfo=timezone(timedelta(hours=3))).timestamp()+86400
             if self.clock()<deadline:continue
             weekly=row['period']=='weekly'
-            tickets=db.execute("SELECT f.id,f.user_id FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.giveaway_day=? AND f.active=1 AND coalesce(i.status,'') NOT IN ('refund_requested','refunded') ORDER BY f.id",(day,)).fetchall()
+            tickets=sorted(self.funded_bonus_rows(db,minimum=5000,round_id=day),key=lambda r:r['id'])
             round_=db.execute('SELECT seed FROM giveaway_rounds WHERE day=?',(day,)).fetchone()
             seed=round_['seed'] if round_ else new_seed();rng=FairRandom(seed,day,0)
             ticket=tickets[min(len(tickets)-1,int(rng.draw()*len(tickets)))] if tickets else None
@@ -500,14 +535,15 @@ class Service:
         if action in ('cashback-claim','giveaway-enter'):
             bonus=self.bonuses(db,uid);calendar=self.bonus_calendar(now)
             if action=='giveaway-enter':
-                ticket=db.execute("SELECT f.id FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.user_id=? AND f.active=1 AND f.amount>=5000 AND f.giveaway_day IS NULL AND coalesce(i.status,'') NOT IN ('refund_requested','refunded') ORDER BY f.created,f.id LIMIT 1",(uid,)).fetchone()
+                available=self.funded_bonus_rows(db,uid=uid,minimum=5000,unassigned=True)
+                ticket=available[0] if available else None
                 if not ticket: raise ValueError('Для участия нужен подтверждённый депозит от 50 BStars')
                 db.execute('UPDATE funding_bonuses SET giveaway_day=? WHERE id=?',(bonus['giveaway']['day'],ticket['id']))
                 self.operation(db,uid,'giveaway','Участие в розыгрыше',detail=bonus['giveaway']['day'])
                 return dict(entered=True)
             if not bonus['claimOpen']: raise ValueError('Кэшбэк доступен в субботу с 10:00 до 20:00 МСК')
             if bonus['cashbackClaimed']: raise ValueError('Кэшбэк на этой неделе уже получен')
-            rows=db.execute("SELECT f.* FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.user_id=? AND f.active=1 AND coalesce(i.status,'') NOT IN ('refund_requested','refunded')",(uid,)).fetchall()
+            rows=self.funded_bonus_rows(db,uid=uid)
             amount=sum(max(0,r['amount']//10-r['cashback_paid']) for r in rows)
             if amount<=0: raise ValueError('Нет доступного кэшбэка')
             db.execute('INSERT INTO weekly_bonus_claims VALUES(?,?,?,?)',(uid,'cashback',calendar['week'],now))
@@ -581,7 +617,8 @@ class Service:
                 if previous and case['free']!='deposit' and (case['free'] not in ('daily','subscribe','nickname') or now<previous['claimed']+86400):
                     raise ValueError('Кейс пока недоступен')
                 if case['free']=='deposit':
-                    funding=db.execute("SELECT f.id FROM funding_bonuses f LEFT JOIN invoices i ON i.id=f.id WHERE f.user_id=? AND f.active=1 AND f.amount>=10000 AND f.case_used=0 AND coalesce(i.status,'') NOT IN ('refund_requested','refunded') ORDER BY f.created,f.id LIMIT 1",(uid,)).fetchone()
+                    available=[r for r in self.funded_bonus_rows(db,uid=uid,minimum=10000) if not r['case_used']]
+                    funding=available[0] if available else None
                     if not funding: raise ValueError('Для кейса нужен подтверждённый депозит от 100 BStars')
                     db.execute('UPDATE funding_bonuses SET case_used=1 WHERE id=?',(funding['id'],))
                 if case['free']=='subscribe' and not b.get('_subscribed'):
@@ -780,7 +817,9 @@ class Service:
             if uid not in self.admins:
                 raise PermissionError('Доступ администратора запрещён')
             self.audit(db,uid,action,b)
-            if action=='admin-maintenance':
+            if action=='admin-giveaway-check':
+                return dict(removedCount=self.reconcile_giveaway_tickets(db))
+            elif action=='admin-maintenance':
                 if type(b.get('enabled')) is not bool:
                     raise ValueError('Некорректный режим обновления')
                 if b['enabled']:
