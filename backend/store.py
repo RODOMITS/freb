@@ -70,7 +70,13 @@ class Store:
                         payload.pop('reply_markup',None)
                         payload['text']=payload.get('text','').split('\nНажми «Ответить»')[0]+'\nИгрок направлен в @BrainrotFreebie_deposit_bot.'
                         db.execute('UPDATE outbox SET payload=? WHERE id=?',(json.dumps(payload,ensure_ascii=False),row['id']))
-            db.execute('PRAGMA user_version=9')
+            giveaway_columns={r['name'] for r in db.execute('PRAGMA table_info(giveaway_rounds)')}
+            for name,kind in [('period',"TEXT NOT NULL DEFAULT 'daily'"),('start_at','REAL'),('end_at','REAL')]:
+                if name not in giveaway_columns:
+                    db.execute(f'ALTER TABLE giveaway_rounds ADD COLUMN {name} {kind}')
+            db.execute("UPDATE giveaway_rounds SET end_at=CAST(strftime('%s',day,'+1 day','-3 hours') AS INTEGER),start_at=CAST(strftime('%s',day,'-3 hours') AS INTEGER) WHERE end_at IS NULL AND day GLOB '????-??-??'")
+            db.execute('PRAGMA user_version=10')
+
 
     def backup(self, directory):
         from datetime import datetime, timezone
