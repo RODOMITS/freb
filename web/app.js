@@ -297,6 +297,8 @@ function parseRoute() {
   return ['rocket','mines','admin','slots','upgrade','profile','cases','bonuses'].includes(hash) || (hash.startsWith('case/') && CASE_BY_ID[hash.slice(5)]) ? hash : 'cases';
 }
 function render({ scroll = false } = {}) {
+  const previousTrack=$('.roulette-track');
+  const settledRoulette=previousTrack?.querySelector('[data-roulette-winner]') ? previousTrack : null;
   const pageScroll=window.scrollY, gridScroll=[...document.querySelectorAll('.item-grid')].map(g=>g.scrollTop);
   if (server?.locked) { $('#main').innerHTML=`<section class="empty-state"><h1>${server.maintenance ? 'Бот на обновлении' : 'Brainrot Freebie'}</h1><p>${esc(server.message)}</p>${server.maintenance ? '<p>Снова открой приложение немного позже.</p>' : ''}</section>`; $('#balance').textContent='0'; $('.bottom-nav').hidden=true; $('.balance').disabled=true; return; }
   cancelAnimationFrame(gaugeFrame);
@@ -318,7 +320,10 @@ function render({ scroll = false } = {}) {
   if (isTelegram) { try { route === 'cases' ? tg.BackButton.hide() : tg.BackButton.show(); } catch {} }
   if(!scroll) {document.querySelectorAll('.item-grid').forEach((g,i)=>{g.scrollTop=gridScroll[i] || 0;});window.scrollTo({top:pageScroll,behavior:'instant'});}
   if (scroll) { window.scrollTo({ top: 0, behavior: 'instant' }); $('#main').focus({ preventScroll: true }); }
-  if (route.startsWith('case/')) centerPreview();
+  if (route.startsWith('case/')) {
+    if(settledRoulette?.dataset.caseId===route.slice(5))$('.roulette-track')?.replaceWith(settledRoulette);
+    centerPreview();
+  }
   if (route === 'upgrade') animateGauge(upgradeChance(getSource(), getTarget()));
   else displayedChance = 0;
   if (scroll && !reducedMotion.matches) $('#main').animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:320,easing:'ease-out'});
@@ -326,7 +331,8 @@ function render({ scroll = false } = {}) {
 }
 function centerPreview() {
   const track = $('.roulette-track'); if (!track) return;
-  const cards = track.children; const card = cards[3];
+  const cards = track.children; const card = track.querySelector('[data-roulette-winner]') || cards[3];
+  if(!card)return;
   track.style.transform = `translateX(${$('.roulette').clientWidth/2 - card.offsetLeft - card.offsetWidth/2}px)`;
 }
 window.addEventListener('hashchange', () => { if (busy) { history.replaceState(null,'',`#${activeRoute}`); return; } closeModal(); render({ scroll:true }); });
@@ -366,6 +372,7 @@ function beginWaitingSpin(element, update) {
 }
 function beginCaseWait(c,fast) {
   const track=$('.roulette-track');
+  track.dataset.caseId=c.id;
   // Identical blocks make wrapping visually continuous while the API is pending.
   const block=Array.from({length:Math.ceil(12/c.drops.length)},()=>shuffledBrainrots(c)).flat().slice(0,12);
   const sequence=Array.from({length:8},()=>block).flat();
@@ -424,12 +431,14 @@ async function openCase(caseId,count=1) {
       const winnerIndex=Math.ceil(currentIndex+motion.velocity*desiredDuration/(3*motion.step));
       track.children[winnerIndex].outerHTML=itemCard(item,{eager:true});
       const winner=track.children[winnerIndex],start=motion.offset,end=width/2-winner.offsetLeft-winner.offsetWidth/2;
+      winner.dataset.rouletteWinner=drop.itemId;
       track.style.transform=`translateX(${start}px)`;
       let stopTicks=()=>{};
       try {
         const animation=track.animate([{transform:`translateX(${start}px)`},{transform:`translateX(${end}px)`}],{duration:brakingDuration(start-end,motion.velocity),easing:'cubic-bezier(.3333333333,1,.6666666667,1)',fill:'forwards'});
         stopTicks=watchTicks(animation,(start-end)/motion.step);await animation.finished;track.style.transform=`translateX(${end}px)`;animation.cancel();
       } catch {track.style.transform=`translateX(${end}px)`;} finally {stopTicks();}
+      centerPreview();
       sound.play('win');notifyHaptic(true);
     }
   } finally {setBusy(false);}
