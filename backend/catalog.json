@@ -327,31 +327,27 @@
       "drops": [
         {
           "itemId": "lagrand",
-          "baseChance": 0.32351336011867954
+          "baseChance": 0.426115464577003
         },
         {
           "itemId": "bananito",
-          "baseChance": 0.14533546813755804
-        },
-        {
-          "itemId": "esok",
-          "baseChance": 0.03115117174376242
+          "baseChance": 0.426115464577003
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.42117830082637386
+          "baseChance": 0.06565648488725417
         },
         {
           "itemId": "tictac",
-          "baseChance": 0.05881359133427445
+          "baseChance": 0.05994722533184076
         },
         {
           "itemId": "queenbee",
-          "baseChance": 0.005720887954100482
+          "baseChance": 0.018471133855749253
         },
         {
           "itemId": "garama",
-          "baseChance": 0.014287219885251208
+          "baseChance": 0.0036942267711498507
         }
       ]
     },
@@ -365,35 +361,31 @@
       "drops": [
         {
           "itemId": "esok",
-          "baseChance": 0.4772571487657038
+          "baseChance": 0.39610232172633686
         },
         {
           "itemId": "ketupat",
-          "baseChance": 0.004019914923699337
-        },
-        {
-          "itemId": "tictac",
-          "baseChance": 0.018722936310596915
+          "baseChance": 0.39610232172633686
         },
         {
           "itemId": "queenbee",
-          "baseChance": 0.47353815742732175
+          "baseChance": 0.08644764576945242
         },
         {
           "itemId": "boppin",
-          "baseChance": 0.016699891362721472
+          "baseChance": 0.05935211500589271
         },
         {
           "itemId": "globa",
-          "baseChance": 0.006429188985662106
+          "baseChance": 0.030826292289882262
         },
         {
           "itemId": "food",
-          "baseChance": 0.002577675594264843
+          "baseChance": 0.025974419568415792
         },
         {
           "itemId": "bunny",
-          "baseChance": 0.0007550866300298457
+          "baseChance": 0.005194883913683159
         }
       ]
     },
@@ -406,32 +398,24 @@
       "image": "img/cases/night.png",
       "drops": [
         {
-          "itemId": "tictac",
-          "baseChance": 0.48414440298107186
-        },
-        {
           "itemId": "lavadorito",
-          "baseChance": 0.010973105628488721
+          "baseChance": 0.3865615438926806
         },
         {
-          "itemId": "eviledon",
-          "baseChance": 0.004882491390439429
-        },
-        {
-          "itemId": "boppin",
-          "baseChance": 0.46974381921825653
+          "itemId": "tictac",
+          "baseChance": 0.3865615438926806
         },
         {
           "itemId": "guest666",
-          "baseChance": 0.01906698120606624
+          "baseChance": 0.19284537538244292
         },
         {
           "itemId": "americano",
-          "baseChance": 0.007339608156179324
+          "baseChance": 0.02835961402682984
         },
         {
           "itemId": "casaboo",
-          "baseChance": 0.003849591419497922
+          "baseChance": 0.005671922805365968
         }
       ]
     },
@@ -445,35 +429,23 @@
       "drops": [
         {
           "itemId": "lavadorito",
-          "baseChance": 0.4521128669132874
+          "baseChance": 0.3077868077868078
         },
         {
           "itemId": "cash",
-          "baseChance": 0.029376877121391844
-        },
-        {
-          "itemId": "pizza",
-          "baseChance": 0.01306194538728526
-        },
-        {
-          "itemId": "burguro",
-          "baseChance": 0.005448310578035525
-        },
-        {
-          "itemId": "capitano",
-          "baseChance": 0.40928341865273743
-        },
-        {
-          "itemId": "breakfast",
-          "baseChance": 0.05897710895150011
+          "baseChance": 0.3077868077868078
         },
         {
           "itemId": "truckini",
-          "baseChance": 0.022689657289038503
+          "baseChance": 0.32676242676242684
+        },
+        {
+          "itemId": "breakfast",
+          "baseChance": 0.04805329805329806
         },
         {
           "itemId": "ketupatbro",
-          "baseChance": 0.009049815106723967
+          "baseChance": 0.009610659610659612
         }
       ]
     },
@@ -487,27 +459,23 @@
       "drops": [
         {
           "itemId": "pizza",
-          "baseChance": 0.46787721270655724
+          "baseChance": 0.392076605332332
         },
         {
           "itemId": "spooky",
-          "baseChance": 0.03212278729344276
-        },
-        {
-          "itemId": "cookie",
-          "baseChance": 0.4305232215745477
+          "baseChance": 0.392076605332332
         },
         {
           "itemId": "rosey",
-          "baseChance": 0.04842609362067551
+          "baseChance": 0.1834697709350356
         },
         {
           "itemId": "cakini",
-          "baseChance": 0.018631574469490576
+          "baseChance": 0.026980848666917003
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.0024191103352862726
+          "baseChance": 0.0053961697333834
         }
       ]
     },
@@ -521,27 +489,19 @@
       "drops": [
         {
           "itemId": "capitano",
-          "baseChance": 0.22142935562997865
+          "baseChance": 0.3
         },
         {
           "itemId": "cerberus",
-          "baseChance": 0.2294046483047235
+          "baseChance": 0.3
         },
         {
           "itemId": "bumbatron",
-          "baseChance": 0.049165996065297875
-        },
-        {
-          "itemId": "fortunu",
-          "baseChance": 0.38031900789333
-        },
-        {
-          "itemId": "foxini",
-          "baseChance": 0.10366024746548909
+          "baseChance": 0.39
         },
         {
           "itemId": "kalika",
-          "baseChance": 0.016020744641180907
+          "baseChance": 0.01
         }
       ]
     },
@@ -555,31 +515,31 @@
       "drops": [
         {
           "itemId": "cerberus",
-          "baseChance": 0.47399891013172074
+          "baseChance": 0.3593615687291341
         },
         {
           "itemId": "pegasus",
-          "baseChance": 0.026001089868279235
+          "baseChance": 0.3593615687291341
         },
         {
           "itemId": "ketupatbro",
-          "baseChance": 0.4308466251397791
+          "baseChance": 0.1374592527193403
         },
         {
           "itemId": "jellymoby",
-          "baseChance": 0.04143007452815429
+          "baseChance": 0.061399616020182124
         },
         {
           "itemId": "kraken",
-          "baseChance": 0.01594079789544395
+          "baseChance": 0.04022646442094958
         },
         {
           "itemId": "digi",
-          "baseChance": 0.006382319158177583
+          "baseChance": 0.03515960781771647
         },
         {
           "itemId": "mobybros",
-          "baseChance": 0.005400183278445101
+          "baseChance": 0.0070319215635432945
         }
       ]
     },
@@ -593,31 +553,27 @@
       "drops": [
         {
           "itemId": "cerberus",
-          "baseChance": 0.47775616606591265
+          "baseChance": 0.30000000000000004
         },
         {
           "itemId": "pegasus",
-          "baseChance": 0.015395731185137396
-        },
-        {
-          "itemId": "guest666",
-          "baseChance": 0.006848102748949952
-        },
-        {
-          "itemId": "rosey",
-          "baseChance": 0.45366077761125656
+          "baseChance": 0.30000000000000004
         },
         {
           "itemId": "foxini",
-          "baseChance": 0.030629972440396565
+          "baseChance": 0.18378378378378377
+        },
+        {
+          "itemId": "rosey",
+          "baseChance": 0.1562162162162162
         },
         {
           "itemId": "dragon",
-          "baseChance": 0.011786912477075605
+          "baseChance": 0.05
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.003922337471271282
+          "baseChance": 0.01
         }
       ]
     },
@@ -631,31 +587,27 @@
       "drops": [
         {
           "itemId": "casaboo",
-          "baseChance": 0.4399401267678079
+          "baseChance": 0.3
         },
         {
           "itemId": "venuspino",
-          "baseChance": 0.04157606608382534
-        },
-        {
-          "itemId": "dragon",
-          "baseChance": 0.01848380714836681
-        },
-        {
-          "itemId": "kraken",
-          "baseChance": 0.3672973064509573
-        },
-        {
-          "itemId": "digi",
-          "baseChance": 0.09092695621096146
+          "baseChance": 0.3
         },
         {
           "itemId": "lasupr",
-          "baseChance": 0.034978060081139024
+          "baseChance": 0.17144455958549223
+        },
+        {
+          "itemId": "kraken",
+          "baseChance": 0.1685554404145078
+        },
+        {
+          "itemId": "digi",
+          "baseChance": 0.05
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.006797677256942191
+          "baseChance": 0.01
         }
       ]
     },
@@ -669,31 +621,23 @@
       "drops": [
         {
           "itemId": "eviledon",
-          "baseChance": 0.4718709169338504
+          "baseChance": 0.4095572733661279
         },
         {
           "itemId": "boppin",
-          "baseChance": 0.008658948635738345
-        },
-        {
-          "itemId": "globa",
-          "baseChance": 0.019470134430411283
-        },
-        {
-          "itemId": "pegasus",
-          "baseChance": 0.44281945146485224
+          "baseChance": 0.4095572733661279
         },
         {
           "itemId": "rosey",
-          "baseChance": 0.040467918223623396
+          "baseChance": 0.1537526352775826
         },
         {
           "itemId": "bunny",
-          "baseChance": 0.015570737778316688
+          "baseChance": 0.022610681658468027
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.0011418925332076875
+          "baseChance": 0.004522136331693605
         }
       ]
     },
@@ -706,36 +650,28 @@
       "image": "img/cases/sunset.png",
       "drops": [
         {
-          "itemId": "rosey",
-          "baseChance": 0.49914138586027357
-        },
-        {
           "itemId": "fortunu",
-          "baseChance": 0.0005184677675594215
+          "baseChance": 0.34091605258739766
         },
         {
           "itemId": "foxini",
-          "baseChance": 0.00023598567447085398
-        },
-        {
-          "itemId": "venuspino",
-          "baseChance": 0.00010416069769618917
+          "baseChance": 0.34091605258739766
         },
         {
           "itemId": "ginger",
-          "baseChance": 0.4984221263407248
+          "baseChance": 0.16229276561931916
         },
         {
           "itemId": "lasupr",
-          "baseChance": 0.0010068136475201704
+          "baseChance": 0.10814994498210484
         },
         {
           "itemId": "antonio",
-          "baseChance": 0.0003933898644308348
+          "baseChance": 0.039770986853150586
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.00017767014732425945
+          "baseChance": 0.007954197370630117
         }
       ]
     },
@@ -748,28 +684,24 @@
       "image": "img/cases/burrow.png",
       "drops": [
         {
-          "itemId": "globa",
-          "baseChance": 0.4839497075493767
-        },
-        {
           "itemId": "cash",
-          "baseChance": 0.016050292450623265
+          "baseChance": 0.4130179651530198
         },
         {
-          "itemId": "americano",
-          "baseChance": 0.46842093635926896
+          "itemId": "globa",
+          "baseChance": 0.4130179651530198
         },
         {
           "itemId": "bunny",
-          "baseChance": 0.021800886791875345
+          "baseChance": 0.14786945923986639
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.008391110304567443
+          "baseChance": 0.021745508711745055
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.0013870665442882674
+          "baseChance": 0.004349101742349011
         }
       ]
     },
@@ -783,31 +715,23 @@
       "drops": [
         {
           "itemId": "pegasus",
-          "baseChance": 0.46154771942486833
+          "baseChance": 0.37980640380886316
         },
         {
           "itemId": "guest666",
-          "baseChance": 0.0266169634750912
-        },
-        {
-          "itemId": "breakfast",
-          "baseChance": 0.011835317100040531
-        },
-        {
-          "itemId": "foxini",
-          "baseChance": 0.41814273990977235
+          "baseChance": 0.37980640380886316
         },
         {
           "itemId": "ginger",
-          "baseChance": 0.05485070186697925
-        },
-        {
-          "itemId": "kalika",
-          "baseChance": 0.021102577641145873
+          "baseChance": 0.20432911352493263
         },
         {
           "itemId": "lasupr",
-          "baseChance": 0.00590398058210255
+          "baseChance": 0.03004839904778421
+        },
+        {
+          "itemId": "kalika",
+          "baseChance": 0.006009679809556842
         }
       ]
     },
@@ -821,31 +745,27 @@
       "drops": [
         {
           "itemId": "capitano",
-          "baseChance": 0.46439951124031065
-        },
-        {
-          "itemId": "americano",
-          "baseChance": 0.024642646064400336
-        },
-        {
-          "itemId": "bumbatron",
-          "baseChance": 0.010957842695289032
+          "baseChance": 0.37793264666057513
         },
         {
           "itemId": "fortunu",
-          "baseChance": 0.4282691370372856
+          "baseChance": 0.37793264666057513
+        },
+        {
+          "itemId": "bumbatron",
+          "baseChance": 0.14457065963565327
         },
         {
           "itemId": "cakini",
-          "baseChance": 0.047686120205237575
+          "baseChance": 0.06294384104136903
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.01834696930970676
+          "baseChance": 0.030516838334856217
         },
         {
           "itemId": "antonio",
-          "baseChance": 0.005697773447770111
+          "baseChance": 0.006103367666971243
         }
       ]
     },
@@ -859,31 +779,27 @@
       "drops": [
         {
           "itemId": "rosey",
-          "baseChance": 0.4142342084141544
+          "baseChance": 0.29999999999999993
         },
         {
           "itemId": "bumbatron",
-          "baseChance": 0.05937247109789311
-        },
-        {
-          "itemId": "dragon",
-          "baseChance": 0.026393320487952485
+          "baseChance": 0.29999999999999993
         },
         {
           "itemId": "ginger",
-          "baseChance": 0.30893436183769013
+          "baseChance": 0.18245348837209305
         },
         {
           "itemId": "hydrabunny",
-          "baseChance": 0.13154224436217168
+          "baseChance": 0.157546511627907
         },
         {
           "itemId": "kraken",
-          "baseChance": 0.05059932475468141
+          "baseChance": 0.05
         },
         {
           "itemId": "lovebear",
-          "baseChance": 0.008924069045456763
+          "baseChance": 0.01
         }
       ]
     },
