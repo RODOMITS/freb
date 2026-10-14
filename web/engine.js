@@ -83,7 +83,7 @@ export function settleSlots(state, uid, unit = randomUnit(), draw = randomUnit) 
   const result = rollSlots(ITEM_BY_ID[bet.itemId].value,unit,draw);
   return { ...state, balance:state.balance+result.payout, inventory:state.inventory.filter(entry=>entry.uid!==uid), slotResult:result };
 }
-export function newState() { return { version: 1, balance: SETTINGS.startingBalance, inventory: [], promoUsed: false, promos:[{code:SETTINGS.promo,reward:SETTINGS.promoReward,limit:1000,used:0,active:true}], redeemed:[], history:[], mines:null, rocket:null, stats: { opened: 0, upgrades: 0, wins: 0 }, feed: [], slotResult:null }; }
+export function newState() { return { version: 1, balance: SETTINGS.startingBalance, inventory: [], promoUsed: false, promos:[], redeemed:[], history:[], mines:null, rocket:null, stats: { opened: 0, upgrades: 0, wins: 0 }, feed: [], slotResult:null }; }
 export function validateState(value) {
   if (!value || value.version !== 1 || !Number.isFinite(value.balance) || value.balance < 0 || !Array.isArray(value.inventory)) return newState();
   const inventory = value.inventory.filter(x => x && ITEM_BY_ID[x.itemId] && typeof x.uid === 'string');
