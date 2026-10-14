@@ -25,7 +25,7 @@ class Release150Tests(unittest.TestCase):
             def __init__(self,path):
                 key=str(path)
                 if key not in connections:
-                    connections[key]=sqlite3.connect(':memory:',isolation_level=None)
+                    connections[key]=sqlite3.connect(':memory:',isolation_level=None,check_same_thread=False)
                     connections[key].row_factory=sqlite3.Row
                 self.conn=connections[key]
                 super().__init__(path)
@@ -38,6 +38,15 @@ class Release150Tests(unittest.TestCase):
                 except BaseException:
                     self.conn.rollback()
                     raise
+        @contextmanager
+        def read(store):
+            store.conn.execute('PRAGMA query_only=ON')
+            store.conn.execute('BEGIN')
+            try: yield store.conn
+            finally:
+                store.conn.rollback()
+                store.conn.execute('PRAGMA query_only=OFF')
+        MemoryStore.read=read
         self.now=datetime(2026,10,17,13,tzinfo=timezone.utc).timestamp()
         self.patches=[patch.object(module,'Store',MemoryStore),patch.object(Path,'mkdir',lambda *a,**k:None),patch.object(Path,'read_text',lambda *a,**k:CATALOG_SOURCE),patch.object(Path,'is_file',lambda *a,**k:True)]
         for p in self.patches:p.start()
@@ -80,7 +89,7 @@ class Release150Tests(unittest.TestCase):
         self.assertEqual(len(first['result']['drops']),3)
         self.assertEqual(len(self.s.state(200)['inventory']),3)
         self.assertEqual(self.s.state(200)['stats']['opened'],3)
-        self.assertEqual(self.s.state(200)['balance'],50000-49*3)
+        self.assertEqual(self.s.state(200)['balance'],50000-self.s.cases['plant']['price']*3)
         with self.s.store.tx() as db:
             _,state=load_user(db,300);state['balance']=10000;save_user(db,300,state)
         with self.assertRaises(ValueError):self.call(300,'case',body)
@@ -114,7 +123,7 @@ class Release150Tests(unittest.TestCase):
         self.call(200,'upgrade',dict(uids=items,targetId='lovebear'))
         self.call(200,'slots',dict(uid=self.add(['lovebear'])[0]))
         many=self.add(['67']*101)
-        self.call(200,'upgrade',dict(uids=many,targetId='fortunu'))
+        self.call(200,'upgrade',dict(uids=many,targetId='lovebear'))
         self.call(200,'mines-start',dict(uids=self.add(['lovebear']),bombCount=3))
         with self.s.store.tx() as db:
             _,state=load_user(db,200);bombs=state['mines']['bombs']

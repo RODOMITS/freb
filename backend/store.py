@@ -1,5 +1,8 @@
 import json
+import math
+import queue
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -40,9 +43,12 @@ CREATE INDEX IF NOT EXISTS operations_user ON operations(user_id,created DESC);
 class Store:
     def __init__(self, path):
         self.path = str(path)
+        self.write_lock=threading.Lock()
+        self.read_pool=queue.LifoQueue(maxsize=12)
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with self.tx() as db:
             db.executescript(SCHEMA)
+            db.execute('PRAGMA journal_mode=WAL')
             if 'checkout' not in {r['name'] for r in db.execute('PRAGMA table_info(invoices)')}:
                 db.execute('ALTER TABLE invoices ADD COLUMN checkout TEXT')
             if 'held_until' not in {r['name'] for r in db.execute('PRAGMA table_info(invoices)')}:
@@ -81,7 +87,36 @@ class Store:
                 for uid in (7221165756,6263182915):
                     db.execute("INSERT INTO account_locks(user_id,balance_frozen,withdrawal_frozen,reason) VALUES(?,1,1,'Проверка депозита') ON CONFLICT(user_id) DO UPDATE SET balance_frozen=1,withdrawal_frozen=1,reason=excluded.reason",(uid,))
                 db.execute("INSERT INTO controls VALUES('incident_hold_20261014',1)")
-            db.execute('PRAGMA user_version=11')
+            if 'next_tick' not in {r['name'] for r in db.execute('PRAGMA table_info(users)')}:
+                db.execute('ALTER TABLE users ADD COLUMN next_tick REAL')
+                for row in db.execute("SELECT id,state FROM users WHERE json_extract(state,'$.mines.status')='active' OR json_extract(state,'$.rocket.status')='active'").fetchall():
+                    db.execute('UPDATE users SET next_tick=? WHERE id=?',(next_tick(json.loads(row['state'])),row['id']))
+            audit_columns={r['name'] for r in db.execute('PRAGMA table_info(audit)')}
+            for name,kind in [('drop_day','TEXT'),('drop_value','REAL')]:
+                if name not in audit_columns: db.execute(f'ALTER TABLE audit ADD COLUMN {name} {kind}')
+            if 'invoice_url' not in {r['name'] for r in db.execute('PRAGMA table_info(invoices)')}:
+                db.execute('ALTER TABLE invoices ADD COLUMN invoice_url TEXT')
+            db.execute('CREATE TABLE IF NOT EXISTS account_rates(user_id INTEGER NOT NULL,kind TEXT NOT NULL,tokens REAL NOT NULL,updated REAL NOT NULL,PRIMARY KEY(user_id,kind))')
+            db.executescript("""
+CREATE INDEX IF NOT EXISTS users_due ON users(next_tick) WHERE next_tick IS NOT NULL;
+CREATE INDEX IF NOT EXISTS sessions_expires ON sessions(expires);
+CREATE INDEX IF NOT EXISTS transfers_user_status ON transfers(user_id,kind,status,created);
+CREATE INDEX IF NOT EXISTS transfers_created ON transfers(created DESC);
+CREATE INDEX IF NOT EXISTS invoices_user_status ON invoices(user_id,status,held_until);
+CREATE INDEX IF NOT EXISTS invoices_created ON invoices(created DESC);
+CREATE INDEX IF NOT EXISTS referrals_inviter ON referrals(inviter,created DESC);
+CREATE INDEX IF NOT EXISTS referral_results ON referral_ledger(invitee);
+CREATE INDEX IF NOT EXISTS bonus_round ON funding_bonuses(giveaway_day,active,amount);
+CREATE INDEX IF NOT EXISTS giveaway_deadlines ON giveaway_rounds(end_at);
+CREATE INDEX IF NOT EXISTS audit_feed ON audit(id DESC) WHERE action='drop';
+CREATE INDEX IF NOT EXISTS audit_day_top ON audit(drop_day,drop_value DESC,created,id) WHERE action='drop';
+CREATE INDEX IF NOT EXISTS outbox_pending ON outbox(retry_at) WHERE sent=0 AND attempts<10;
+CREATE INDEX IF NOT EXISTS legacy_request_size ON requests(created) WHERE length(response)>2048;
+CREATE INDEX IF NOT EXISTS operations_quests ON operations(user_id,coalesce(completed,created),type) WHERE status!='pending';
+""")
+            db.execute("INSERT OR IGNORE INTO partners(user_id,code) SELECT id,'u'||id FROM users")
+            db.execute('INSERT OR IGNORE INTO referral_codes(code,user_id) SELECT code,user_id FROM partners')
+            db.execute('PRAGMA user_version=12')
 
 
     def backup(self, directory):
@@ -102,21 +137,49 @@ class Store:
             old.unlink()
         return destination
 
+    def connect(self, readonly=False):
+        target=Path(self.path).resolve().as_uri()+'?mode=ro' if readonly else self.path
+        db=sqlite3.connect(target,timeout=2,isolation_level=None,uri=readonly,check_same_thread=False)
+        db.row_factory=sqlite3.Row
+        db.execute('PRAGMA foreign_keys=ON')
+        db.execute('PRAGMA busy_timeout=2000')
+        if readonly: db.execute('PRAGMA query_only=ON')
+        else: db.execute('PRAGMA synchronous=FULL')
+        return db
+
+    @contextmanager
+    def read(self):
+        try: db=self.read_pool.get_nowait()
+        except queue.Empty: db=self.connect(readonly=True)
+        try:
+            db.execute('BEGIN')
+            yield db
+        finally:
+            db.rollback()
+            try: self.read_pool.put_nowait(db)
+            except queue.Full: db.close()
+
+    def close(self):
+        while True:
+            try: self.read_pool.get_nowait().close()
+            except queue.Empty: break
+
     @contextmanager
     def tx(self):
-        db = sqlite3.connect(self.path, timeout=15, isolation_level=None)
-        db.row_factory = sqlite3.Row
-        db.execute('PRAGMA journal_mode=WAL')
-        db.execute('PRAGMA foreign_keys=ON')
-        db.execute('BEGIN IMMEDIATE')
+        if not self.write_lock.acquire(timeout=2):
+            raise sqlite3.OperationalError('database is locked')
+        db=None
         try:
+            db=self.connect()
+            db.execute('BEGIN IMMEDIATE')
             yield db
             db.commit()
         except BaseException:
-            db.rollback()
+            if db is not None: db.rollback()
             raise
         finally:
-            db.close()
+            if db is not None: db.close()
+            self.write_lock.release()
 
 
 def load_user(db, uid):
@@ -126,5 +189,18 @@ def load_user(db, uid):
     return row, json.loads(row['state'])
 
 
+def next_tick(state):
+    deadlines=[]
+    mines=state.get('mines')
+    if mines and mines.get('status')=='active': deadlines.append(mines['expiresAt']/1000)
+    rocket=state.get('rocket')
+    if rocket and rocket.get('status')=='active':
+        deadline=rocket['endAt']/1000
+        target=rocket.get('autoCash')
+        if target and target<=rocket['crash']: deadline=min(deadline,rocket['startAt']/1000+math.log(target)/.24)
+        deadlines.append(deadline)
+    return min(deadlines) if deadlines else None
+
+
 def save_user(db, uid, state):
-    db.execute('UPDATE users SET state=? WHERE id=?', (json.dumps(state),uid))
+    db.execute('UPDATE users SET state=?,next_tick=? WHERE id=?', (json.dumps(state),next_tick(state),uid))

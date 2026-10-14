@@ -1,12 +1,14 @@
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
 import logging
 import os
 import secrets
+import sqlite3
+import re
 import time
-from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import parse_qsl
@@ -15,12 +17,14 @@ import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from .economy import RTP
 
 from .auth import validate_init_data
 from .service import Service, ident, integer
 from .store import load_user, save_user
 from .risk import Limits
+from .security import BoundedRateLimiter, RateLimited, SecurityMiddleware
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB_ROOT = ROOT/'web' if (ROOT/'web').exists() else ROOT
@@ -35,16 +39,23 @@ CHANNEL = int(os.getenv('SUBSCRIPTION_CHANNEL','-1003739017107'))
 TERMS_URL = os.getenv('TERMS_URL','')
 PRIVACY_URL = os.getenv('PRIVACY_URL','')
 PAYMENTS = os.getenv('PAYMENTS_ENABLED','false').lower()=='true' and bool(TERMS_URL.startswith('https://') and PRIVACY_URL.startswith('https://') and BOT_TOKEN and WEBHOOK_SECRET)
+BACKUP_DIRECTORY=os.getenv('BACKUP_DIRECTORY','')
 service = Service(os.getenv('DATABASE_PATH',str(ROOT/'data/freebie.sqlite3')), admins=[int(x) for x in os.getenv('ADMIN_IDS','7613236278,1821268346').split(',')], starting_balance=float(os.getenv('STARTING_BALANCE','0')),limits=Limits.load(ROOT/'limits.json'))
+
+
+telegram_client=None
 
 
 async def telegram(method, data):
     if not BOT_TOKEN:
         raise HTTPException(503,'Токен бота ещё не настроен')
     try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            response = await client.post(f'https://api.telegram.org/bot{BOT_TOKEN}/{method}',json=data)
-            result = response.json()
+        if telegram_client is not None:
+            response=await telegram_client.post(f'https://api.telegram.org/bot{BOT_TOKEN}/{method}',json=data)
+        else:
+            async with httpx.AsyncClient(timeout=8) as client:
+                response=await client.post(f'https://api.telegram.org/bot{BOT_TOKEN}/{method}',json=data)
+        result=response.json()
         if not result.get('ok'):
             raise HTTPException(502,'Telegram временно отклонил запрос')
         return result['result']
@@ -65,7 +76,7 @@ async def scheduler():
 async def notify_outbox():
     while True:
         if BOT_TOKEN:
-            with service.store.tx() as db:
+            with service.store.read() as db:
                 message=db.execute('SELECT * FROM outbox WHERE sent=0 AND attempts<10 AND retry_at<=? ORDER BY rowid LIMIT 1',(time.time(),)).fetchone()
             if message:
                 try:
@@ -79,14 +90,13 @@ async def notify_outbox():
 
 
 def tick():
-    with service.store.tx() as db:
-        service.tick(db)
+    service.refresh_runtime()
 
 
 async def backups():
     while True:
         try:
-            await asyncio.to_thread(service.store.backup,Path(service.store.path).parent/'backups')
+            await asyncio.to_thread(service.store.backup,Path(BACKUP_DIRECTORY) if BACKUP_DIRECTORY else Path(service.store.path).parent/'backups')
         except Exception:
             log.error('Backup failed',exc_info=True)
         await asyncio.sleep(86400)
@@ -112,6 +122,8 @@ async def configure_telegram():
 
 @asynccontextmanager
 async def lifespan(app):
+    global telegram_client
+    telegram_client=httpx.AsyncClient(timeout=httpx.Timeout(8,connect=3,pool=2),limits=httpx.Limits(max_connections=12,max_keepalive_connections=8))
     setup_task=asyncio.create_task(configure_telegram())
     task=asyncio.create_task(scheduler())
     notifications=asyncio.create_task(notify_outbox())
@@ -137,6 +149,9 @@ async def lifespan(app):
         await notifications
     except asyncio.CancelledError:
         pass
+    await telegram_client.aclose()
+    telegram_client=None
+    service.store.close()
 
 
 app=FastAPI(title='Brainrot Freebie API',docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
@@ -152,49 +167,49 @@ async def forbidden(request, error):
     return JSONResponse(dict(detail=str(error)),status_code=403)
 
 
-@app.middleware('http')
-async def limits(request: Request, call_next):
-    try:
-        length=int(request.headers.get('content-length','0') or 0)
-    except ValueError:
-        return JSONResponse(dict(detail='Invalid content length'),status_code=400)
-    if length>32768 or request.method=='POST' and len(await request.body())>32768:
-        return JSONResponse(dict(detail='Запрос слишком большой'),status_code=413)
-    response=await call_next(request)
-    response.headers['X-Content-Type-Options']='nosniff'
-    response.headers['Referrer-Policy']='same-origin'
-    if request.url.path.startswith('/api/') or request.url.path=='/runtime-config':
-        response.headers['Cache-Control']='no-store'
-    return response
+INDEX_HTML=(WEB_ROOT/'index.html').read_text(encoding='utf-8').replace('<span id="balance">500</span>','<span id="balance">0</span>')
+INLINE_HASHES=[base64.b64encode(hashlib.sha256(match.encode()).digest()).decode() for match in re.findall(r'<script>(.*?)</script>',INDEX_HTML,re.S)]
+app.add_middleware(GZipMiddleware,minimum_size=1024,compresslevel=3)
+app.add_middleware(SecurityMiddleware,webhook_secret=lambda:WEBHOOK_SECRET,script_hashes=INLINE_HASHES,
+                   api_concurrency=int(os.getenv('API_CONCURRENCY','24')),
+                   body_timeout=float(os.getenv('REQUEST_BODY_TIMEOUT','8')))
+
+
+@app.exception_handler(RateLimited)
+async def throttled(request,error):
+    return JSONResponse(dict(detail=str(error)),status_code=429,headers={'Retry-After':str(error.retry_after)})
+
+
+@app.exception_handler(sqlite3.OperationalError)
+async def database_busy(request,error):
+    if 'locked' in str(error).lower() or 'busy' in str(error).lower():
+        return JSONResponse(dict(detail='Сервер занят. Повтори запрос немного позже.'),status_code=503,headers={'Retry-After':'1'})
+    log.error('Database operation failed')
+    return JSONResponse(dict(detail='Ошибка базы данных. Обратись в поддержку.'),status_code=500)
 
 
 def user_id(authorization):
     if not authorization or not authorization.startswith('Bearer '):
         raise HTTPException(401,'Открой приложение в Telegram')
     try:
-        uid=service.authenticate(authorization[7:])
-        if uid not in service.admins and service.maintenance():
+        uid,maintenance=service.authenticated_user(authorization[7:])
+        if uid not in service.admins and maintenance:
             raise HTTPException(503,dict(code='maintenance',message='Бот на обновлении. Скоро вернёмся.'))
         return uid
     except PermissionError as error:
         raise HTTPException(401,str(error))
 
 
-rate_windows=defaultdict(deque)
+rate_windows=BoundedRateLimiter()
 def rate_limit(key, maximum, seconds):
-    now=time.monotonic()
-    if len(rate_windows)>10000:
-        rate_windows.clear()
-    window=rate_windows[key]
-    while window and window[0]<now-seconds:
-        window.popleft()
-    if len(window)>=maximum:
-        raise HTTPException(429,'Слишком много запросов. Подожди немного.')
-    window.append(now)
+    rate_windows.check(key,maximum,seconds)
 
 
 async def object_body(request):
-    body=await request.json()
+    try:
+        body=await request.json()
+    except (ValueError,UnicodeDecodeError,RecursionError):
+        raise ValueError('Некорректный JSON') from None
     if not isinstance(body,dict):
         raise ValueError('Ожидается объект')
     return body
@@ -207,7 +222,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',version='1.6.9',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',version='1.7.0',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -215,7 +230,8 @@ async def download_backup(authorization: str=Header(default='')):
     uid=user_id(authorization)
     if uid not in service.admins:
         raise HTTPException(403,'Доступ запрещён')
-    path=await asyncio.to_thread(service.store.backup,Path(service.store.path).parent/'backups')
+    rate_limit(('backup',uid),1,60)
+    path=await asyncio.to_thread(service.store.backup,Path(BACKUP_DIRECTORY) if BACKUP_DIRECTORY else Path(service.store.path).parent/'backups')
     return FileResponse(path,filename=path.name,media_type='application/octet-stream')
 
 
@@ -224,6 +240,7 @@ async def refund_invoice(invoice_id: str,authorization: str=Header(default='')):
     uid=user_id(authorization)
     if uid not in service.admins:
         raise HTTPException(403,'Доступ запрещён')
+    rate_limit(('refund',uid),5,60)
     with service.store.tx() as db:
         row=db.execute('SELECT * FROM invoices WHERE id=?',(invoice_id,)).fetchone()
         if not row or row['status']!='paid' or not row['charge']:
@@ -259,12 +276,15 @@ async def auth(request: Request):
 
 @app.get('/api/state')
 def state(authorization: str=Header(default=''),limit: int=200):
-    return service.state(user_id(authorization),max(20,min(limit,5000)))
+    uid=user_id(authorization)
+    rate_limit(('state',uid),12,10)
+    return service.state(uid,max(20,min(limit,200)))
 
 
 @app.get('/api/catalog')
 def catalog(authorization: str=Header(default='')):
-    user_id(authorization)
+    uid=user_id(authorization)
+    rate_limit(('catalog',uid),6,60)
     return dict(items=list(service.items.values()),cases=list(service.cases.values()),
                 settings=dict(rtp=RTP),
                 slotRules=dict(pairChance=(RTP-.15)/2,tripleChance=.03,pairMultiplier=2,tripleMultiplier=5),
@@ -274,7 +294,8 @@ def catalog(authorization: str=Header(default='')):
 @app.get('/api/history')
 def full_history(authorization: str=Header(default=''),offset: int=0,limit: int=200):
     uid=user_id(authorization)
-    with service.store.tx() as db:
+    rate_limit(('history',uid),10,10)
+    with service.store.read() as db:
         rows=db.execute('SELECT * FROM operations WHERE user_id=? ORDER BY created DESC,rowid DESC LIMIT ? OFFSET ?',(uid,max(20,min(limit,200)),max(0,offset))).fetchall()
     from datetime import datetime,timezone
     result=[dict(id=h['id'],type=h['type'],status=h['status'],delta=h['delta']/100,title=h['title'],detail=h['detail'],createdAt=datetime.fromtimestamp(h['created'],timezone.utc).isoformat(),proof=json.loads(h['proof']) if h['proof'] else None) for h in rows]
@@ -311,7 +332,8 @@ async def action(action: str, request: Request, authorization: str=Header(defaul
 @app.get('/api/fair/reveal/{seed_hash}')
 def reveal(seed_hash: str, authorization: str=Header(default='')):
     uid=user_id(authorization)
-    with service.store.tx() as db:
+    rate_limit(('proof',uid),20,10)
+    with service.store.read() as db:
         row=db.execute('SELECT seed FROM seeds WHERE hash=? AND user_id=?',(seed_hash,uid)).fetchone()
     if not row:
         raise HTTPException(404,'Seed ещё не раскрыт')
@@ -320,8 +342,9 @@ def reveal(seed_hash: str, authorization: str=Header(default='')):
 
 @app.get('/api/round/{round_id}')
 def round_proof(round_id: str,authorization: str=Header(default='')):
-    user_id(authorization)
-    with service.store.tx() as db:
+    uid=user_id(authorization)
+    rate_limit(('proof',uid),20,10)
+    with service.store.read() as db:
         row=db.execute('SELECT data FROM rounds WHERE id=?',(round_id,)).fetchone()
     if not row:
         raise HTTPException(404,'Раунд не найден')
@@ -349,11 +372,16 @@ async def invoice(request: Request,authorization: str=Header(default=''),idempot
         prior=db.execute('SELECT * FROM invoices WHERE id=?',(invoice_id,)).fetchone()
         if prior and (prior['stars']!=amount or prior['status']!='pending'):
             raise ValueError('Счёт уже использован')
+        if prior and prior['invoice_url']:
+            return dict(url=prior['invoice_url'])
+        service.consume_rate(db,uid,'invoice',capacity=10,seconds=60)
         if not prior:
             service.bind_referral(db,uid,body.get('referralCode'))
         bonus=prior['bonus'] if prior else service.topup_bonus(db,uid,amount*150)
         db.execute('INSERT OR IGNORE INTO invoices(id,user_id,stars,status,charge,created,bonus) VALUES(?,?,?,?,?,?,?)',(invoice_id,uid,amount,'pending',None,time.time(),bonus))
     link=await telegram('createInvoiceLink',dict(title='BStars',description=f'{amount} Stars → {(amount*150+bonus)/100:g} BStars',payload=invoice_id,provider_token='',currency='XTR',prices=[dict(label='BStars',amount=amount)]))
+    with service.store.tx() as db:
+        db.execute("UPDATE invoices SET invoice_url=? WHERE id=? AND status='pending'",(link,invoice_id))
     return dict(url=link)
 
 
@@ -439,7 +467,7 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
 
 @app.get('/')
 def index():
-    return HTMLResponse((WEB_ROOT/'index.html').read_text(encoding='utf-8').replace('<span id="balance">500</span>','<span id="balance">0</span>'))
+    return HTMLResponse(INDEX_HTML,headers={'Cache-Control':'no-cache'})
 
 
 # Explicit allowlist: never serve .env, databases, backend source or archives.
