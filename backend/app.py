@@ -207,7 +207,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',version='1.6.8',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',version='1.6.9',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -345,6 +345,7 @@ async def invoice(request: Request,authorization: str=Header(default=''),idempot
         raise ValueError('Требуется Idempotency-Key')
     invoice_id=hashlib.sha256(f'{uid}:{idempotency_key}'.encode()).hexdigest()
     with service.store.tx() as db:
+        service.check_account_lock(db,uid,'invoice')
         prior=db.execute('SELECT * FROM invoices WHERE id=?',(invoice_id,)).fetchone()
         if prior and (prior['stars']!=amount or prior['status']!='pending'):
             raise ValueError('Счёт уже использован')
@@ -367,6 +368,8 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
         with service.store.tx() as db:
             row=db.execute('SELECT * FROM invoices WHERE id=?',(query.get('invoice_payload'),)).fetchone()
             ok=bool(PAYMENTS and (query.get('from',{}).get('id') in service.admins or not (db.execute("SELECT value FROM controls WHERE name='maintenance'").fetchone() or {'value':0})['value']) and row and (row['status']=='pending' or row['status']=='processing' and row['checkout']==query.get('id')) and row['user_id']==query.get('from',{}).get('id') and query.get('currency')=='XTR' and row['stars']==query.get('total_amount'))
+            if ok and service.account_lock(db,row['user_id'])['balanceFrozen']:
+                ok=False
             if ok and row['status']=='pending':
                 db.execute('UPDATE invoices SET status=?,checkout=? WHERE id=?',('processing',query['id'],row['id']))
         await telegram('answerPreCheckoutQuery',dict(pre_checkout_query_id=query['id'],ok=ok,**({} if ok else dict(error_message='Счёт недоступен. Создай новый.'))))

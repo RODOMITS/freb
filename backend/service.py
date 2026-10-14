@@ -139,6 +139,19 @@ class Service:
             removed+=1
         return removed
 
+    def account_lock(self, db, uid):
+        row=db.execute('SELECT * FROM account_locks WHERE user_id=?',(uid,)).fetchone()
+        return dict(balanceFrozen=bool(row and row['balance_frozen']),withdrawalFrozen=bool(row and row['withdrawal_frozen']),freezeReason=row['reason'] if row else '')
+
+    def check_account_lock(self, db, uid, action):
+        lock=self.account_lock(db,uid)
+        if lock['withdrawalFrozen'] and action in ('withdraw','partner-withdraw','withdraw-approve'):
+            raise ValueError('Вывод заморожен администратором. Обратись в поддержку.')
+        # Existing wagers may settle, but their proceeds remain locked.
+        if lock['balanceFrozen'] and action not in ('withdraw-cancel','fair-rotate','mines-cash','rocket-cash') and not action.startswith('admin-'):
+            raise ValueError('Баланс заморожен администратором. Обратись в поддержку.')
+        return lock
+
     def register_funding(self, db, uid, funding_id, amount):
         # Principal only: referral boosts and administrator credits are excluded.
         db.execute('INSERT OR IGNORE INTO funding_bonuses(id,user_id,amount,created) VALUES(?,?,?,?)',(funding_id,uid,amount,self.clock()))
@@ -425,6 +438,7 @@ class Service:
     def snapshot(self, db, uid, history_limit=200):
         row, state = load_user(db,uid)
         result = copy.deepcopy(state)
+        result.update(self.account_lock(db,uid))
         result['onlineCount']=self.online_count(uid)
         result['balance'] /= 100
         result['quests']=self.quests(db,uid)
@@ -479,7 +493,7 @@ class Service:
             spent=db.execute('SELECT spent FROM bonus_spend WHERE day=?',(day,)).fetchone()
             result['bonusSpentToday']=(spent['spent']/100) if spent else 0
             result['transfers'] = [dict(id=r['id'],userId=r['user_id'],kind=r['kind'],status=r['status'],data=json.loads(r['data'])) for r in db.execute("SELECT * FROM transfers ORDER BY created DESC LIMIT 100")]
-            result['users'] = [dict(id=r['id'],name=json.loads(r['profile']).get('first_name','Игрок'),balance=json.loads(r['state'])['balance']/100) for r in db.execute('SELECT id,profile,state FROM users ORDER BY id LIMIT 100')]
+            result['users'] = [dict(id=r['id'],name=json.loads(r['profile']).get('first_name','Игрок'),balance=json.loads(r['state'])['balance']/100,**self.account_lock(db,r['id'])) for r in db.execute('SELECT id,profile,state FROM users ORDER BY EXISTS(SELECT 1 FROM account_locks l WHERE l.user_id=users.id AND (l.balance_frozen=1 OR l.withdrawal_frozen=1)) DESC,id LIMIT 100')]
         else:
             result['transfers'] = [dict(id=r['id'],kind=r['kind'],status=r['status'],data=json.loads(r['data'])) for r in db.execute('SELECT * FROM transfers WHERE user_id=? ORDER BY created DESC LIMIT 100',(uid,))]
         result['serverNow'] = self.clock()*1000
@@ -526,7 +540,8 @@ class Service:
 
     def execute(self, db, uid, state, action, b):
         now = self.clock()
-        if state.get('debt',0)>0 and action not in ('deposit','fair-rotate','withdraw-cancel') and not action.startswith('admin-'):
+        self.check_account_lock(db,uid,action)
+        if state.get('debt',0)>0 and action not in ('deposit','fair-rotate','withdraw-cancel','mines-cash','rocket-cash') and not action.startswith('admin-'):
             raise ValueError('Есть задолженность после возврата платежа. Обратись в поддержку.')
         if action in ('case','upgrade','slots','mines-start','rocket-bet'):
             control=db.execute("SELECT value FROM controls WHERE name='paused'").fetchone()
@@ -831,6 +846,44 @@ class Service:
                 if type(b.get('paused')) is not bool:
                     raise ValueError('Invalid pause state')
                 db.execute("INSERT INTO controls VALUES('paused',?) ON CONFLICT(name) DO UPDATE SET value=excluded.value",(int(b['paused']),))
+            elif action=='admin-freeze':
+                target=integer(b.get('userId'),1,2**53-1)
+                load_user(db,target)
+                if type(b.get('balanceFrozen')) is not bool or type(b.get('withdrawalFrozen')) is not bool:
+                    raise ValueError('Укажи режим заморозки')
+                reason=str(b.get('reason','')).strip()[:120]
+                db.execute('INSERT INTO account_locks VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET balance_frozen=excluded.balance_frozen,withdrawal_frozen=excluded.withdrawal_frozen,reason=excluded.reason,actor=excluded.actor,updated=excluded.updated',(target,int(b['balanceFrozen']),int(b['withdrawalFrozen']),reason,uid,now))
+                self.operation(db,target,'admin','Изменение заморозки',detail=f'Баланс: {"заморожен" if b["balanceFrozen"] else "доступен"} · вывод: {"заморожен" if b["withdrawalFrozen"] else "доступен"} · {reason}')
+                return self.account_lock(db,target)
+            elif action=='admin-deposit-reverse':
+                transfer=db.execute("SELECT * FROM transfers WHERE id=? AND kind='deposit' AND status='approved'",(str(b.get('requestId')),)).fetchone()
+                if not transfer: raise ValueError('Можно отменить только подтверждённый депозит; повторная отмена запрещена')
+                target=transfer['user_id']
+                target_state=state if target==uid else load_user(db,target)[1]
+                data=json.loads(transfer['data'])
+                total=cents(data['value'])+data.get('bonus',0)
+                if type(total) is not int or total<=0: raise ValueError('Некорректная сумма депозита')
+                self.revoke_funding(db,target,transfer['id'],target_state)
+                used=min(total,target_state['balance'])
+                target_state['balance']-=used
+                target_state['debt']=target_state.get('debt',0)+total-used
+                db.execute("UPDATE transfers SET status='reversed' WHERE id=?",(transfer['id'],))
+                db.execute("INSERT INTO account_locks VALUES(?,1,1,'Отмена ошибочного депозита',?,?) ON CONFLICT(user_id) DO UPDATE SET balance_frozen=1,withdrawal_frozen=1,reason=excluded.reason,actor=excluded.actor,updated=excluded.updated",(target,uid,now))
+                self.reconcile_giveaway_tickets(db)
+                # Cancel queued withdrawals before they can be issued.
+                for pending in db.execute("SELECT * FROM transfers WHERE user_id=? AND kind IN ('withdraw','partner-withdraw') AND status='pending'",(target,)).fetchall():
+                    value=json.loads(pending['data'])
+                    if pending['kind']=='withdraw': target_state['inventory'].extend(value['entries'])
+                    else: db.execute('UPDATE partners SET claimed=claimed-? WHERE user_id=?',(cents(value['value']),target))
+                    db.execute("UPDATE transfers SET status='cancelled' WHERE id=?",(pending['id'],))
+                    self.operation(db,target,pending['kind'],'Вывод отменён','done',detail='Отменено вместе с ошибочным депозитом',op_id=pending['id'])
+                if target!=uid: save_user(db,target,target_state)
+                self.operation(db,target,'deposit','Отмена подтверждения депозита',delta=-used,detail=f'Депозит {transfer["id"]} · отменено {total/100:g} BStars · задолженность {target_state["debt"]/100:g} BStars · администратор {uid}',op_id='reverse-'+transfer['id'])
+                # Supersede an approval notification that has not been delivered yet.
+                db.execute("UPDATE outbox SET sent=1 WHERE id=? AND sent=0",('deposit-result-'+transfer['id'],))
+                notice=dict(chat_id=target,text=f'Подтверждение депозита #{transfer["id"][:8]} отменено. Начисление {total/100:g} BStars отозвано. Баланс и вывод заморожены до проверки. Обратись в поддержку.')
+                db.execute('INSERT OR IGNORE INTO outbox(id,message,method,payload) VALUES(?,?,?,?)',('deposit-reversed-'+transfer['id'],'','sendMessage',json.dumps(notice)))
+                return dict(reversed=total/100,deducted=used/100,debt=target_state['debt']/100,balanceFrozen=True,withdrawalFrozen=True)
             elif action=='admin-balance':
                 target=integer(b.get('userId'),1,2**53-1)
                 amount=cents(integer(b.get('amount')))
@@ -865,9 +918,17 @@ class Service:
                 target_state=state if target==uid else load_user(db,target)[1]
                 data=json.loads(transfer['data'])
                 approve=b['decision']=='approve'
+                if approve and transfer['kind'] in ('withdraw','partner-withdraw'):
+                    self.check_account_lock(db,target,'withdraw-approve')
+                    if self.account_lock(db,target)['balanceFrozen']:
+                        raise ValueError('Баланс пользователя заморожен; выдача запрещена')
                 if transfer['kind']=='withdraw' and approve and not self.withdrawal_open(now):
                     raise ValueError('Выдача предметов только в субботу с 16:00 до 17:00 МСК')
                 if transfer['kind']=='partner-withdraw':
+                    if approve:
+                        partner=self.partner(db,target)
+                        if cents(partner['earned'])<cents(partner['claimed']):
+                            raise ValueError('Комиссия уменьшилась после отмены пополнения. Отклони заявку.')
                     if approve and not self.bonus_calendar(now)['open']:
                         raise ValueError('Выдача комиссии только в субботу с 10:00 до 20:00 МСК')
                     if approve and (target_state.get('debt',0)>0 or self.withdraw_hold(db,target)>now):

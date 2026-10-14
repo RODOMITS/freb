@@ -311,6 +311,11 @@ function render({ scroll = false } = {}) {
   $('#main').innerHTML = route.startsWith('case/') ? renderCase(CASE_BY_ID[route.slice(5)]) : route === 'upgrade' ? renderUpgrade() : route==='bonuses' ? renderQuests() : route === 'slots' ? renderSlots() : route==='rocket' ? renderRocket(rocketState,rocketUids,rocketAuto,rocketAutoTarget,{...featureUI,rocketAmount,server:!!server,now:server?.now}) : route==='mines' ? renderMines(state,mineUids,mineCount,featureUI) : route==='admin' ? server && !state.isAdmin ? '<div class="empty-state">Доступ запрещён</div>' : renderAdmin(state,playerName,{...featureUI,server:!!server}) : route === 'profile' ? renderProfile() : renderCases();
   if (server && route==='profile') enhanceServerProfile();
   if(server) {
+    if(state.balanceFrozen || state.withdrawalFrozen) {
+      $('#main').insertAdjacentHTML('afterbegin',`<p class="service-notice" role="status">${state.balanceFrozen ? 'Баланс заморожен: ставки и продажа недоступны.' : ''} ${state.withdrawalFrozen ? 'Вывод заморожен.' : ''} Обратись в поддержку.</p>`);
+      if(state.balanceFrozen || state.withdrawalFrozen) document.querySelectorAll('[data-action="withdraw"],[data-action="partner-withdraw"]').forEach(b=>b.disabled=true);
+      if(state.balanceFrozen) document.querySelectorAll('[data-action="open-case"],[data-action="upgrade"],[data-action="spin-slots"],[data-action="mine-start"],[data-action="rocket-start"],[data-action="sell"],[data-action="sell-all"]').forEach(b=>b.disabled=true);
+    }
     if(state.gamesPaused) $('#main').insertAdjacentHTML('afterbegin','<p class="service-notice">Приём новых ставок приостановлен. Активные игры можно завершить.</p>');
     if(state.gamesPaused) document.querySelectorAll('[data-action="open-case"],[data-action="upgrade"],[data-action="spin-slots"],[data-action="mine-start"],[data-action="rocket-start"]').forEach(b=>b.disabled=true);
     if(route==='admin' && state.isAdmin) enhanceFinancialAdmin();
@@ -740,7 +745,7 @@ function runServerRocket() {
     const cash=$('[data-action="rocket-cash"]'); if(cash) cash.disabled=busy||countdown||game.status!=='active'||game.ended;
     const stake=state.inventory.filter(e=>rocketUids.has(e.uid)).reduce((s,e)=>s+ITEM_BY_ID[e.itemId].value,0);
     const amount=rocketAmount.trim() ? Number(rocketAmount) : null, canBet=amount===null ? rocketUids.size>0 : Number.isFinite(amount)&&amount>=.01&&amount<=state.balance&&Math.abs(amount*100-Math.round(amount*100))<1e-7;
-    const launch=$('[data-action="rocket-start"]'); if(launch)launch.disabled=busy||state.gamesPaused||!canSelectRocket()||!canBet;
+    const launch=$('[data-action="rocket-start"]'); if(launch)launch.disabled=busy||state.gamesPaused||state.balanceFrozen||!canSelectRocket()||!canBet;
     if($('#rocket-cash-value')) $('#rocket-cash-value').textContent=money(Math.round(game.stakeValue*Math.floor(value*100))/100);
     serverRocketFrame=requestAnimationFrame(frame);
   }
@@ -748,10 +753,12 @@ function runServerRocket() {
 }
 function walletCard(item,options) { return itemCard(item,options).replace('<button ','<button type="button" '); }
 function depositDialog() {
+  if(state.balanceFrozen){toast('Баланс заморожен. Обратись в поддержку.');return;}
   openModal(`<div class="modal-content wallet-modal"><h2>Пополнение</h2>${state.referrerCode ? `<p>Код ${esc(state.referrerCode)} закреплён · +15% к пополнениям</p>` : '<form id="referral-bind-form" class="promo-form"><input name="referralCode" placeholder="Код человека" aria-label="Реферальный код для пополнения" required maxlength="24"><button class="secondary">Применить</button></form><p>Укажи код человека и получай +15% к пополнениям. Первое закрепление постоянное.</p>'}<p>Выбери брейнрота для депозита</p><form id="deposit-form" class="wallet-deposit-form"><input type="hidden" name="itemId" value=""><div class="item-grid wallet-item-grid" aria-label="Брейнроты для депозита">${ITEMS.filter(i=>(server.config.depositIds || []).includes(i.id)).map(i=>walletCard(i,{action:'select-deposit',id:i.id,selected:false})).join('')}</div><div class="wallet-selection"><span id="deposit-summary">Предмет не выбран</span><button class="primary" id="deposit-submit" disabled>Создать заявку</button></div></form><p>Передай предмет владельцу в игре. BStars начислятся после подтверждения.</p><form id="stars-form" class="admin-form wallet-stars"><label>Telegram Stars<input name="stars" type="number" min="1" max="10000" step="1" required value="100"></label><p>1 Star = 1,5 BStars<br>После оплаты Stars вывод предметов ограничен на ${money(server.config.starsHoldHours/24)} дней. Игры и продажа внутри сайта доступны.</p>${server.config.paymentsEnabled ? `<label class="purchase-consent"><input type="checkbox" name="terms" required>Принимаю <a href="${esc(server.config.termsUrl)}" target="_blank" rel="noopener">условия покупки</a> и срок ограничения вывода</label><button class="primary">Оплатить звёздами</button>` : '<p>Оплата звёздами ещё не включена.</p>'}</form></div>`);
 }
 let withdrawUids=new Set();
 function withdrawalDialog() {
+  if(state.balanceFrozen || state.withdrawalFrozen){toast('Вывод заморожен. Обратись в поддержку.');return;}
   if(server && !state.withdrawalOpen) return openModal('<div class="modal-content"><h2>Расписание вывода</h2><p>Заявки и выдача предметов доступны только в субботу с 16:00 до 17:00 МСК.</p><p>Снять предмет с вывода можно в любое время в профиле.</p></div>');
   if(state.debt>0 || state.refundReviewPending || state.withdrawHeldUntil>server.now()) {
     openModal(`<div class="modal-content"><h2>Вывод временно ограничен</h2><p>${state.debt>0 ? `Задолженность: ${money(state.debt)} BStars. Обратись в поддержку.` : state.refundReviewPending ? 'Возврат Stars уточняется. Обратись в поддержку.' : `После оплаты Stars вывод доступен с ${new Date(state.withdrawHeldUntil).toLocaleString('ru-RU')}.`}</p><a class="secondary" href="${esc(server.config.ownerUrl)}" target="_blank" rel="noopener">Поддержка</a></div>`); return;
@@ -795,8 +802,9 @@ async function pollServer() {
         if(before.rocket?.status==='active' && state.rocket?.status!=='active' && state.rocket?.id===before.rocket.id) rocketResult();
         const financialChanged=JSON.stringify([before.inventory,before.balance,before.gamesPaused,before.debt,before.withdrawHeldUntil,before.refundReviewPending,before.pendingInventory,before.partner,before.withdrawalOpen])!==JSON.stringify([state.inventory,state.balance,state.gamesPaused,state.debt,state.withdrawHeldUntil,state.refundReviewPending,state.pendingInventory,state.partner,state.withdrawalOpen]);
         const flightChanged=JSON.stringify([before.round?.id,before.round?.ended,before.rocket?.status,before.mines])!==JSON.stringify([state.round?.id,state.round?.ended,state.rocket?.status,state.mines]);
-        const changed=(activeRoute==='cases' ? before.gamesPaused!==state.gamesPaused : financialChanged) || activeRoute==='bonuses' && JSON.stringify([before.quests,before.bonuses])!==JSON.stringify([state.quests,state.bonuses]) || ['mines','rocket'].includes(activeRoute) && flightChanged;
-        const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday,before.maintenance])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday,state.maintenance]);
+        const lockChanged=JSON.stringify([before.balanceFrozen,before.withdrawalFrozen])!==JSON.stringify([state.balanceFrozen,state.withdrawalFrozen]);
+        const changed=lockChanged || (activeRoute==='cases' ? before.gamesPaused!==state.gamesPaused : financialChanged) || activeRoute==='bonuses' && JSON.stringify([before.quests,before.bonuses])!==JSON.stringify([state.quests,state.bonuses]) || ['mines','rocket'].includes(activeRoute) && flightChanged;
+        const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday,before.maintenance,before.users])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday,state.maintenance,state.users]);
         if((changed || adminChanged) && !$('#modal').open) {
           const values=[...document.querySelectorAll('#main input')].filter(i=>i.name && i.form?.id).map(i=>({form:i.form.id,name:i.name,value:i.value}));
           const focused=document.activeElement, focus=focused?.form?.id && focused.name ? {form:focused.form.id,name:focused.name} : null;
@@ -893,7 +901,17 @@ document.addEventListener('click', event => {
     case 'confirm-sell-all': if(server)void serverAction('sale-all',{inventoryHash:id}).then(r=>{if(r){closeModal();render();toast('Продано '+r.result.count+' предметов');}});else {const value=state.inventory.reduce((sum,e)=>sum+ITEM_BY_ID[e.itemId].value,0);state.inventory=[];state.balance+=value;persist();closeModal();render();}break;
     case 'admin-maintenance': void serverAction('admin-maintenance',{enabled:!state.maintenance}).then(r=>{if(r)render();});break;
     case 'admin-tab': document.querySelectorAll('[data-admin-section]').forEach(s=>s.hidden=id!=='all' && s.dataset.adminSection!==id);document.querySelectorAll('[data-action=admin-tab]').forEach(b=>b.classList.toggle('active',b.dataset.id===id));break;
-    case 'admin-user': $('#admin-balance-form').elements.namedItem('userId').value=id;toast('Пользователь выбран');break;
+    case 'admin-user': {
+      $('#admin-balance-form').elements.namedItem('userId').value=id;
+      const form=$('#admin-freeze-form'), user=state.users.find(u=>String(u.id)===id);
+      if(form) {form.elements.namedItem('userId').value=id;form.elements.namedItem('balanceFrozen').checked=!!user?.balanceFrozen;form.elements.namedItem('withdrawalFrozen').checked=!!user?.withdrawalFrozen;form.elements.namedItem('reason').value=user?.freezeReason || '';}
+      toast('Пользователь выбран');break;
+    }
+    case 'deposit-reverse-preview': {
+      const t=state.transfers.find(t=>t.id===id && t.kind==='deposit' && t.status==='approved');if(!t)break;
+      openModal(`<div class="modal-content"><h2>Отменить подтверждение?</h2><p>Игрок: ${t.userId}<br>Депозит: ${esc(t.id)}<br>Будет отозвано: ✦ ${money(t.data.value+(t.data.bonus || 0)/100)} BStars</p><p>Начисление и бонус будут списаны. Потраченная сумма станет задолженностью. Кэшбэк и доступные награды этого депозита отменятся. Баланс и вывод игрока заморозятся, ожидающие выводы отменятся.</p><button class="secondary danger" data-action="deposit-reverse-confirm" data-id="${esc(t.id)}">Отменить подтверждение депозита</button></div>`);break;
+    }
+    case 'deposit-reverse-confirm': void serverAction('admin-deposit-reverse',{requestId:id}).then(r=>{if(r){closeModal();render();toast('Начисление отменено. Баланс и вывод заморожены.');}});break;
     case 'locked-item': break;
     case 'withdraw-cancel': void serverAction('withdraw-cancel',{requestId:id}).then(r=>{if(r)render();}); break;
     case 'partner-claim': case 'partner-withdraw': void serverAction(action,{}).then(r=>{if(r){render();if(r.result?.requestId)ownerContact(r.result.requestId);}});break;
@@ -938,6 +956,10 @@ document.addEventListener('submit', async event => {
   const formId=event.target.id;
   if(formId==='referral-bind-form'){event.preventDefault();if(busy)return;const r=await serverAction('referral-bind',{code:new FormData(event.target).get('referralCode')});if(r){render();depositDialog();}return;}
   if(formId==='partner-code-form'){event.preventDefault();if(busy)return;const r=await serverAction('partner-code',{code:new FormData(event.target).get('code')});if(r)render();return;}
+  if (formId==='admin-freeze-form') {
+    event.preventDefault();const data=new FormData(event.target);
+    void serverAction('admin-freeze',{userId:Number(data.get('userId')),balanceFrozen:data.has('balanceFrozen'),withdrawalFrozen:data.has('withdrawalFrozen'),reason:data.get('reason')}).then(r=>{if(r){render();toast('Заморозка сохранена');}});return;
+  }
   if (!['promo-form','admin-balance-form','admin-promo-form','deposit-form','stars-form','fair-form'].includes(formId)) return;
   event.preventDefault(); if (busy) return;
   const data=new FormData(event.target);
