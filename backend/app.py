@@ -206,7 +206,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',version='1.5.0',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,rtp=.80,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',version='1.6.0',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,rtp=.80,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -376,6 +376,7 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
                 _,account=load_user(db,uid)
                 delta=row['stars']*150+row['bonus']
                 service.credit(account,delta)
+                service.register_funding(db,uid,row['id'],row['stars']*150)
                 save_user(db,uid,account)
                 service.operation(db,uid,'topup','Пополнение звёздами',delta=delta,detail=f'{row["stars"]} Stars · бонус +{row["bonus"]/100:g} BStars')
                 db.execute('UPDATE invoices SET status=?,charge=?,held_until=? WHERE id=?',('paid',charge,time.time()+service.limits.stars_hold_hours*3600,row['id']))

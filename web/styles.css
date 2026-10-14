@@ -230,3 +230,15 @@ dialog:has(.wallet-modal){width:560px}.wallet-deposit-form{margin:18px 0}.wallet
 @media(max-width:620px){.open-controls{gap:8px}.case-counts{gap:8px;flex:1}.case-counts>button{flex:1;min-width:0;padding:0 10px;gap:7px;font-size:10px}.case-counts>button>strong{font-size:16px}.case-results{gap:7px}.case-result{padding:10px 6px}.case-result img{height:95px}.case-result strong{font-size:10px}.rocket-balance-stake label>span{max-width:45%;text-align:right}}
 
 .upgrade-confetti{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:1000}.upgrade-confetti i{position:absolute;display:block;pointer-events:none;will-change:transform,opacity}
+
+/* Bonuses */
+.bonus-heading{margin:30px 0 16px}.bonus-giveaway,.bonus-cashback{border:1px solid rgba(255,255,255,.09);border-radius:24px;padding:24px;margin:0 0 20px;background:linear-gradient(130deg,rgba(255,111,183,.1),rgba(103,229,212,.04))}
+.bonus-giveaway{display:grid;grid-template-columns:minmax(120px, .7fr) 1fr;gap:24px;align-items:center;overflow:hidden;position:relative}
+.bonus-prize{display:grid;place-items:center}.bonus-prize img{width:100%;max-width:230px;filter:drop-shadow(0 14px 28px rgba(255,111,183,.23));animation:bonus-float 4s ease-in-out infinite}
+.bonus-eyebrow{font-size:10px;letter-spacing:1.5px;color:var(--pink)}.bonus-giveaway h2{font-size:25px;margin:10px 0}.bonus-giveaway p,.bonus-cashback p{color:var(--muted);font-size:12px;line-height:1.6}
+.bonus-giveaway small{display:block;color:var(--muted);font-size:11px;margin-top:12px}.bonus-numbers{display:flex;flex-wrap:wrap;gap:22px;margin:20px 0}.bonus-numbers span{color:var(--muted);font-size:11px}.bonus-numbers b{display:block;margin-top:8px;font-size:19px;color:var(--text)}.bonus-cashback .selection-title strong{font-size:24px;color:var(--mint)}
+.bonus-giveaway .primary,.bonus-cashback .primary{width:100%}.bonus-cashback .selection-title{margin:0}.partner-panel{margin-bottom:24px}.partner-stats{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}
+@keyframes bonus-float{50%{transform:translateY(-10px) rotate(2deg)}}
+@media(max-width:540px){.bonus-giveaway{grid-template-columns:1fr;padding:20px;gap:4px}.bonus-prize img{max-width:165px}.bonus-giveaway h2{font-size:23px}.bonus-numbers{gap:18px}}
+@media(prefers-reduced-motion:reduce){.bonus-prize img{animation:none}}
+.streamer-mode .bonus-numbers b,.streamer-mode .partner-panel .referral-link,.streamer-mode .partner-panel input{filter:blur(7px)}
