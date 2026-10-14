@@ -354,20 +354,28 @@ function beginWaitingSpin(element, update) {
   if(!reducedMotion.matches)frame=requestAnimationFrame(loop);
   return ()=>{ended=true;cancelAnimationFrame(frame);return progress;};
 }
-function beginCaseWait(c) {
+function beginCaseWait(c,fast) {
   const track=$('.roulette-track');
-  const sequence=Array.from({length:Math.ceil(60/c.drops.length)},()=>shuffledBrainrots(c)).flat();
+  // Identical blocks make wrapping visually continuous while the API is pending.
+  const block=Array.from({length:Math.ceil(12/c.drops.length)},()=>shuffledBrainrots(c)).flat().slice(0,12);
+  const sequence=Array.from({length:8},()=>block).flat();
   track.innerHTML=sequence.map(i=>itemCard(i,{eager:true})).join('');
   const first=track.children[3],step=track.children[4].offsetLeft-first.offsetLeft;
   const base=$('.roulette').clientWidth/2-first.offsetLeft-first.offsetWidth/2;
+  const velocity=(fast ? 75 : 20)*step;
   let offset=base;
   const stop=beginWaitingSpin(track,t=>{
-    const shift=(t*5*step)%(step*12);offset=base-shift;
+    const distance=t*velocity;offset=base-distance%(step*12);
     track.style.transform=`translateX(${offset}px)`;
-    return shift/step*12;
+    return distance/step*12;
   });
   track.style.transform=`translateX(${base}px)`;
-  return ()=>{stop();return offset;};
+  return ()=>{stop();return {offset,velocity,step};};
+}
+function brakingDuration(distance,velocity) {
+  // ease-out cubic starts at 3× its average velocity.
+  // Choosing duration this way matches the waiting velocity exactly.
+  return reducedMotion.matches ? 80 : 3000*distance/velocity;
 }
 
 async function openCase(caseId,count=1) {
@@ -378,9 +386,9 @@ async function openCase(caseId,count=1) {
   const fast=fastMode || reducedMotion.matches;
   setBusy(true);haptic('medium');
   document.querySelectorAll('[data-action="open-case"]').forEach(button=>{button.disabled=true;button.textContent='Открываем…';});
-  const stopWaiting=beginCaseWait(c);
+  const stopWaiting=beginCaseWait(c,fast);
   const response=server ? await serverAction('case',{caseId,count},true) : null;
-  const waitingOffset=stopWaiting();
+  const waiting=stopWaiting();
   if(server && !response){setBusy(false);render();return;}
   const drops=server ? response.result.drops || [response.result] : [];
   if(!server) {
@@ -397,18 +405,20 @@ async function openCase(caseId,count=1) {
   try {
     for(const [index,drop] of drops.entries()) {
       const item=ITEM_BY_ID[drop.itemId];
-      if(index===0)track.children[28].outerHTML=itemCard(item,{eager:true});
-      else {
-        const sequence=Array.from({length:Math.ceil(44/c.drops.length)},()=>shuffledBrainrots(c)).flat();sequence[28]=item;
-        track.innerHTML=sequence.map(i=>itemCard(i,{eager:true})).join('');
-      }
-      const first=track.children[3],winner=track.children[28],width=$('.roulette').clientWidth;
-      const start=index===0 ? waitingOffset : width/2-first.offsetLeft-first.offsetWidth/2,end=width/2-winner.offsetLeft-winner.offsetWidth/2;
+      let motion=waiting;
+      if(index>0)motion=beginCaseWait(c,fast)();
+      const first=track.children[3],width=$('.roulette').clientWidth;
+      const base=width/2-first.offsetLeft-first.offsetWidth/2;
+      const currentIndex=3+(base-motion.offset)/motion.step;
+      const desiredDuration=fast ? .35 : count===3 ? 1.7 : 3.6;
+      const winnerIndex=Math.ceil(currentIndex+motion.velocity*desiredDuration/(3*motion.step));
+      track.children[winnerIndex].outerHTML=itemCard(item,{eager:true});
+      const winner=track.children[winnerIndex],start=motion.offset,end=width/2-winner.offsetLeft-winner.offsetWidth/2;
       track.style.transform=`translateX(${start}px)`;
       let stopTicks=()=>{};
       try {
-        const animation=track.animate([{transform:`translateX(${start}px)`},{transform:`translateX(${end}px)`}],{duration:fast ? 350 : count===3 ? 1700 : 4700,easing:'cubic-bezier(.12,.7,.12,1)',fill:'forwards'});
-        stopTicks=watchTicks(animation,25);await animation.finished;track.style.transform=`translateX(${end}px)`;animation.cancel();
+        const animation=track.animate([{transform:`translateX(${start}px)`},{transform:`translateX(${end}px)`}],{duration:brakingDuration(start-end,motion.velocity),easing:'cubic-bezier(.3333333333,1,.6666666667,1)',fill:'forwards'});
+        stopTicks=watchTicks(animation,(start-end)/motion.step);await animation.finished;track.style.transform=`translateX(${end}px)`;animation.cancel();
       } catch {track.style.transform=`translateX(${end}px)`;} finally {stopTicks();}
       sound.play('win');notifyHaptic(true);
     }
@@ -472,7 +482,8 @@ async function upgrade() {
   $('[data-action="upgrade"]').disabled=true;$('[data-action="upgrade"]').textContent='Апгрейдим…';
   document.querySelectorAll('.quick-buttons button,.selection-panel button,.selection-panel input').forEach(el=>el.disabled=true);
   const waitingPointer=$('.pointer-orbit');
-  const stopWaiting=beginWaitingSpin(waitingPointer,t=>{const angle=t*540;waitingPointer.style.transform=`rotate(${angle}deg)`;return angle;});
+  const angularVelocity=fast ? 7200 : 1200;
+  const stopWaiting=beginWaitingSpin(waitingPointer,t=>{const angle=t*angularVelocity;waitingPointer.style.transform=`rotate(${angle}deg)`;return angle;});
   const response=server ? await serverAction('upgrade',{uids:[...sourceUids],targetId:target.id},true) : null;
   const waitingAngle=stopWaiting();
   if(server && !response){setBusy(false);render();return;}
@@ -489,9 +500,13 @@ async function upgrade() {
   $('.upgrade-circle').classList.add('spinning'); $('.upgrade-machine').classList.add('running');
   $('[data-action="upgrade"]').disabled = true; $('[data-action="upgrade"]').textContent = 'Апгрейдим…';
   document.querySelectorAll('.quick-buttons button,.selection-panel button,.selection-panel input').forEach(el => el.disabled = true);
-  const pointer = $('.pointer-orbit'); const turns = waitingAngle + 360 * 6 + ((landing.angle-waitingAngle%360+360)%360);
+  const pointer = $('.pointer-orbit');
+  const minimumDistance=angularVelocity*(fast ? .26 : 3.9)/3;
+  const remainder=(landing.angle-waitingAngle%360+360)%360;
+  const distance=remainder+360*Math.max(0,Math.ceil((minimumDistance-remainder)/360));
+  const turns=waitingAngle+distance;
   let stopTicks = () => {};
-  try { const animation = pointer.animate([{transform:`rotate(${waitingAngle}deg)`},{transform:`rotate(${turns}deg)`}],{duration:fast ? 260 : 3900,easing:'cubic-bezier(.14,.65,.12,1)',fill:'forwards'}); stopTicks = watchTicks(animation,turns/12); await animation.finished; pointer.style.transform=`rotate(${turns}deg)`; animation.cancel(); } catch { pointer.style.transform=`rotate(${turns}deg)`; } finally { stopTicks(); }
+  try { const animation = pointer.animate([{transform:`rotate(${waitingAngle}deg)`},{transform:`rotate(${turns}deg)`}],{duration:brakingDuration(distance,angularVelocity),easing:'cubic-bezier(.3333333333,1,.6666666667,1)',fill:'forwards'}); stopTicks = watchTicks(animation,distance/12); await animation.finished; pointer.style.transform=`rotate(${turns}deg)`; animation.cancel(); } catch { pointer.style.transform=`rotate(${turns}deg)`; } finally { stopTicks(); }
   $('.upgrade-circle').classList.remove('spinning'); $('.upgrade-circle').classList.add('landing');
   cancelAnimationFrame(gaugeFrame);
   const exactLevel=Number.isFinite(landing.level) ? landing.level : liquidLevel(chance);
