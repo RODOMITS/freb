@@ -521,44 +521,70 @@ async function upgrade() {
   openModal(`<div class="modal-content ${win ? target.rarity : source.rarity}"><h2>${win ? 'Апгрейд выполнен' : 'Апгрейд не удался'}</h2>${win ? `<div class="result-art"><img src="${target.image}" alt="${esc(target.name)}"></div><div class="result-name">${esc(target.name)}</div><div class="result-value">✦ ${money(target.value)}</div>` : '<div class="modal-status-icon" style="color:#e38fa9">↺</div>'}<p style="margin-top:14px">${win ? 'Предмет добавлен в инвентарь.' : `Потрачено предметов: ${stake.entries.length} · ✦ ${money(stake.value)}`}<br>Шанс: ${percent(chance)}.</p><div class="modal-actions"><button class="primary" data-action="close-modal">Понятно</button>${win ? `<button class="secondary" data-action="to-upgrade" data-id="${wonUid}">Ещё апгрейд</button>` : '<button class="secondary" data-action="goto-cases">К кейсам</button>'}</div></div>`);
   if(win)celebrateUpgrade();
 }
+function beginSlotWait(track,fast) {
+  const previous=track.querySelector('.reel-symbol')?.outerHTML;
+  const block=Array.from({length:12},()=>slotSymbol(ITEMS[Math.floor(randomUnit()*ITEMS.length)].id));
+  if(previous)block[0]=previous;
+  track.innerHTML=Array.from({length:8},()=>block.join('')).join('');
+  track.setAttribute('aria-hidden','true');
+  const step=track.children[1].offsetTop-track.children[0].offsetTop;
+  const velocity=(fast ? 60 : 18)*step;
+  let offset=0;
+  track.style.transform='translateY(0)';
+  const stop=beginWaitingSpin(track,t=>{
+    const distance=t*velocity;offset=-distance%(step*12);
+    track.style.transform=`translateY(${offset}px)`;
+    return distance/step*12;
+  });
+  return ()=>{stop();return {offset,step,velocity};};
+}
 async function spinSlots() {
   if (busy) return;
   if (!state.inventory.some(entry=>entry.uid===slotUid)) return toast('Выбери предмет для ставки.');
-  const fast = fastMode || reducedMotion.matches;
-  if (server) { if (!await serverAction('slots',{uid:slotUid})) return; }
-  else state = settleSlots(state,slotUid);
-  const result = state.slotResult;
-  if (!server) state = recordOperation(state,{type:'slots',title:'Слоты',status:result.multiplier ? 'win' : 'lose',delta:result.payout,detail:`Ставка: ${result.betValue} BStars · ${result.symbols.map(id=>ITEM_BY_ID[id].name).join(' / ')} · ×${result.multiplier}`});
-  persist({balanceVisible:false}); setBusy(true); haptic('medium');
-  $('.slots-cabinet').classList.remove('has-win'); $('.slots-cabinet').classList.add('running');
-  $('.slots-readout').textContent = 'Барабаны вращаются…';
-  $('[data-action="spin-slots"]').disabled = true;
-  $('[data-action="spin-slots"]').textContent = 'Крутим…';
+  const fast=fastMode || reducedMotion.matches;
+  setBusy(true);haptic('medium');
+  $('.slots-cabinet').classList.remove('has-win');$('.slots-cabinet').classList.add('running');
+  $('.slots-readout').textContent='Барабаны вращаются…';
+  $('[data-action="spin-slots"]').disabled=true;$('[data-action="spin-slots"]').textContent='Крутим…';
   document.querySelectorAll('.slot-inventory button,.slot-stake button').forEach(button=>button.disabled=true);
-  const tracks = [...document.querySelectorAll('[data-reel]')];
-  await Promise.all(tracks.map(async (track,index)=>{
-    track.setAttribute('aria-hidden','true');
-    const initial = track.innerHTML;
-    const filler = Array.from({length:27},()=>ITEMS[Math.floor(randomUnit()*ITEMS.length)].id);
-    track.innerHTML = initial + filler.map(slotSymbol).join('') + slotSymbol(result.symbols[index]);
-    const distance = track.lastElementChild.offsetTop-track.firstElementChild.offsetTop;
-    const duration = reducedMotion.matches ? 100 : fast ? 400+index*120 : 2000+index*500;
-    let stopTicks = ()=>{};
-    try {
-      const animation = track.animate([{transform:'translateY(0)'},{transform:`translateY(-${distance}px)`}],{duration,easing:'cubic-bezier(.1,.75,.1,1)',fill:'forwards'});
-      stopTicks = watchTicks(animation,28); await animation.finished;
-      track.style.transform = `translateY(-${distance}px)`; animation.cancel();
-    } catch { track.style.transform = `translateY(-${distance}px)`; } finally { stopTicks(); }
-    sound.play('tick');
-  }));
-  slotUid = null; setBusy(false); render();
-  if (result.multiplier) {
-    const matched = result.symbols.filter((id,_,ids)=>ids.filter(other=>other===id).length>1);
+  const tracks=[...document.querySelectorAll('[data-reel]')];
+  const stops=tracks.map(track=>beginSlotWait(track,fast));
+  let result;
+  try {
+    const response=server ? await serverAction('slots',{uid:slotUid},true) : null;
+    const motions=stops.map(stop=>stop());
+    if(server && !response)return;
+    if(!server)state=settleSlots(state,slotUid);
+    result=state.slotResult;
+    if(!server)state=recordOperation(state,{type:'slots',title:'Слоты',status:result.multiplier ? 'win' : 'lose',delta:result.payout,detail:`Ставка: ${result.betValue} BStars · ${result.symbols.map(id=>ITEM_BY_ID[id].name).join(' / ')} · ×${result.multiplier}`});
+    persist({balanceVisible:false});
+    await Promise.all(tracks.map(async(track,index)=>{
+      const motion=motions[index];
+      const duration=fast ? .4+index*.12 : 2+index*.45;
+      const winnerIndex=Math.ceil(-motion.offset/motion.step+motion.velocity*duration/(3*motion.step));
+      track.children[winnerIndex].outerHTML=slotSymbol(result.symbols[index]);
+      const end=track.children[0].offsetTop-track.children[winnerIndex].offsetTop;
+      let stopTicks=()=>{};
+      try {
+        const animation=track.animate([{transform:`translateY(${motion.offset}px)`},{transform:`translateY(${end}px)`}],{duration:brakingDuration(motion.offset-end,motion.velocity),easing:'cubic-bezier(.3333333333,1,.6666666667,1)',fill:'forwards'});
+        stopTicks=watchTicks(animation,(motion.offset-end)/motion.step);await animation.finished;
+        track.style.transform=`translateY(${end}px)`;animation.cancel();
+      } catch {track.style.transform=`translateY(${end}px)`;} finally {stopTicks();}
+      sound.play('tick');
+    }));
+    slotUid=null;
+  } finally {
+    stops.forEach(stop=>stop());setBusy(false);render();
+  }
+  if(!result)return;
+  if(result.multiplier) {
+    const matched=result.symbols.filter((id,_,ids)=>ids.filter(other=>other===id).length>1);
     document.querySelectorAll('.slot-window').forEach((window,index)=>window.classList.toggle('match',matched.includes(result.symbols[index])));
   }
-  sound.play(result.multiplier ? 'win' : 'lose'); notifyHaptic(Boolean(result.multiplier));
+  sound.play(result.multiplier ? 'win' : 'lose');notifyHaptic(Boolean(result.multiplier));
   toast(result.multiplier ? `${result.multiplier===5 ? 'Три совпадения' : 'Два совпадения'}! +${money(result.payout)} BStars` : 'Без совпадений');
 }
+
 function fairness(caseId) {
   const c = CASE_BY_ID[caseId];
   if (!c) return;
@@ -568,7 +594,39 @@ function fairness(caseId) {
 function topup() { if (server) return depositDialog(); state.balance += SETTINGS.topUp; state = recordOperation(state,{type:'topup',title:'Пополнение',detail:'Начисление BStars',delta:SETTINGS.topUp}); persist(); closeModal(); render(); haptic(); toast(`Пополнение +${SETTINGS.topUp} BStars`); }
 
 async function mineAction(action,id) {
-  if (server) { const response=await serverAction(action==='mine-start' ? 'mines-start' : action==='mine-cash' ? 'mines-cash' : 'mines-reveal',action==='mine-start' ? {uids:[...mineUids],bombCount:mineCount} : action==='mine-cell' ? {index:Number(id)} : {}); if(response) {mineUids.clear(); render(); sound.play(state.mines.status==='lost' ? 'lose' : state.mines.status==='won' ? 'win' : 'tick');} return; }
+  if(server) {
+    if(busy)return;
+    const machine=$('.mines-machine'),cell=action==='mine-cell' ? $('[data-action="mine-cell"][data-id="'+id+'"]') : null;
+    if(action==='mine-cell' && (!cell || cell.disabled))return;
+    setBusy(true);haptic();
+    machine.classList.add(action==='mine-start' ? 'starting' : action==='mine-cash' ? 'cashing' : 'revealing');
+    machine.setAttribute('aria-busy','true');
+    document.querySelectorAll('.mines-machine button,.mine-inventory button').forEach(button=>button.disabled=true);
+    if(cell){cell.classList.add('pending');cell.setAttribute('aria-label','Клетка '+(Number(id)+1)+', открывается');}
+    const play=$('.mine-play');
+    if(action!=='mine-cell')play.textContent=action==='mine-start' ? 'Начинаем…' : 'Забираем…';
+    $('.mine-summary').textContent=action==='mine-cell' ? 'Открываем клетку…' : action==='mine-start' ? 'Подготавливаем поле…' : 'Забираем выигрыш…';
+    const began=performance.now();
+    let response;
+    try {
+      response=await serverAction(action==='mine-start' ? 'mines-start' : action==='mine-cash' ? 'mines-cash' : 'mines-reveal',action==='mine-start' ? {uids:[...mineUids],bombCount:mineCount} : action==='mine-cell' ? {index:Number(id)} : {},true);
+      if(response && !reducedMotion.matches) {
+        const remaining=(fastMode ? 140 : 300)-(performance.now()-began);
+        if(remaining>0)await new Promise(resolve=>setTimeout(resolve,remaining));
+      }
+    } finally {setBusy(false);if(response)mineUids.clear();render();}
+    if(response) {
+      const game=state.mines;
+      sound.play(game.status==='lost' ? 'lose' : game.status==='won' ? 'win' : 'tick');
+      if(game.status!=='active')notifyHaptic(game.status==='won');
+      if(action==='mine-cell') {
+        const revealed=$('[data-action="mine-cell"][data-id="'+id+'"]');
+        if(revealed && !reducedMotion.matches)revealed.animate([{transform:'rotateY(-75deg) scale(.94)',opacity:.5},{transform:'rotateY(0) scale(1)',opacity:1}],{duration:fastMode ? 160 : 300,easing:'ease-out'});
+      }
+      if(game.status==='won')toast('Забрано +'+money(game.payout)+' BStars');
+    }
+    return;
+  }
   try {
     if (action==='mine-start') { state=startMines(state,mineUids,mineCount); mineUids.clear(); sound.play('tick'); }
     else if (action==='mine-cash') { state=cashMines(state); sound.play('win'); notifyHaptic(true); }
