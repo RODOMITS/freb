@@ -6,6 +6,7 @@ import re
 import secrets
 import time
 import uuid
+import unicodedata
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -13,6 +14,13 @@ from .economy import RTP, cents, crash_point, distribution, landing, mines_multi
 from .fair import FairRandom, commitment, new_seed
 from .store import Store, load_user, save_user
 from .risk import Limits
+
+
+def nickname_matches(profile):
+    name=' '.join(str(profile.get(key) or '') for key in ('first_name','last_name'))
+    name=unicodedata.normalize('NFKC',name)
+    name=''.join(char for char in name if unicodedata.category(char)!='Cf')
+    return re.search(r'@brainrotfreebie(?![a-z0-9_])',name,re.I) is not None
 
 
 def ident():
@@ -549,9 +557,8 @@ class Service:
                     raise ValueError('Кейс доступен после первого входа по реферальной ссылке')
                 if case['free']=='nickname':
                     profile=json.loads(load_user(db,uid)[0]['profile'])
-                    name=profile.get('first_name','')+' '+profile.get('last_name','')
-                    if not re.search(r'(?<![\w@])@brainrotfreebie(?![\w])',name,re.I):
-                        raise ValueError('Добавь @BrainrotFreebie в имя Telegram и заново открой приложение')
+                    if not nickname_matches(profile):
+                        raise ValueError('Добавь @BrainrotFreebie в имя Telegram')
                 db.execute('INSERT INTO claims VALUES(?,?,?) ON CONFLICT(user_id,case_id) DO UPDATE SET claimed=excluded.claimed',(uid,case['id'],now))
             price=cents(case['price'])
             if state['balance'] < price*count:

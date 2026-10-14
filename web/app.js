@@ -127,10 +127,19 @@ function feedMarkup() {
   }).join('')}</div></section>`;
 }
 const freeLabel=c=>({daily:'Раз в 24 часа',subscribe:'За подписку',referral:'По приглашению',nickname:'За ник',deposit:'За депозит от 100'}[c.free] || 'Бесплатно');
+function topDropMarkup() {
+  const top=state.topDrop,item=top && ITEM_BY_ID[top.itemId];
+  return item ? `<section class="top-drop"><img src="${item.image}" alt=""><div><small>ТОП ДРОП ДНЯ · МСК</small><h2>${esc(item.name)}</h2><span>${esc(top.playerName)} · ✦ ${money(item.value)}</span></div></section>` : '';
+}
+function refreshLiveDrops(before) {
+  if(activeRoute!=='cases')return;
+  if(JSON.stringify(before.feed)!==JSON.stringify(state.feed) && $('.live-section'))$('.live-section').outerHTML=feedMarkup();
+  if(JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) && $('.top-drop-slot'))$('.top-drop-slot').innerHTML=topDropMarkup();
+}
+
 function renderCases() {
   const groups=Object.fromEntries(['Бесплатные','Дешёвые','Средние','Мощные'].map(name=>[name,CASES.filter(c=>(c.free ? 'Бесплатные' : c.price<=199 ? 'Дешёвые' : c.price<=699 ? 'Средние' : 'Мощные')===name)]).filter(([,cases])=>cases.length));
-  const top=state.topDrop, topItem=top && ITEM_BY_ID[top.itemId];
-  return `${feedMarkup()}${topItem ? `<section class="top-drop"><img src="${topItem.image}" alt=""><div><small>ТОП ДРОП ДНЯ · МСК</small><h2>${esc(topItem.name)}</h2><span>${esc(top.playerName)} · ✦ ${money(topItem.value)}</span></div></section>` : ''}<div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div>${Object.entries(groups).map(([name,cases],i)=>`<section id="theme-${i}" class="case-theme"><h2>${esc(name)}</h2><div class="case-grid">${cases.map(c=>`<a href="#case/${c.id}" class="case-card" style="--hue:${c.hue}deg"><h3>${esc(c.name)}</h3><img class="case-art" src="${c.image}" onerror="this.onerror=null;this.src='img/cases/plant.png'" alt="Кейс ${esc(c.name)}"><span class="case-price">${c.free ? freeLabel(c) : `✦ ${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`).join('')}`;
+  return `${feedMarkup()}<div class="top-drop-slot">${topDropMarkup()}</div><div class="page-head compact-head"><h1>Кейсы</h1><span class="section-count">${CASES.length}</span></div>${Object.entries(groups).map(([name,cases],i)=>`<section id="theme-${i}" class="case-theme"><h2>${esc(name)}</h2><div class="case-grid">${cases.map(c=>`<a href="#case/${c.id}" class="case-card" style="--hue:${c.hue}deg"><h3>${esc(c.name)}</h3><img class="case-art" src="${c.image}" onerror="this.onerror=null;this.src='img/cases/plant.png'" alt="Кейс ${esc(c.name)}"><span class="case-price">${c.free ? freeLabel(c) : `✦ ${money(c.price)} <small>BStars</small>`}</span><span class="case-arrow">↗</span></a>`).join('')}</div></section>`).join('')}`;
 }
 function shuffledBrainrots(caseConfig) {
   const items = caseConfig.drops.map(drop => ITEM_BY_ID[drop.itemId]);
@@ -253,7 +262,7 @@ function subscriptionPrompt() {
   openModal('<div class="modal-content"><h2>Кейс за подписку</h2><p>Подпишись на канал, затем вернись и снова нажми «Открыть».</p><div class="modal-actions"><button class="primary" data-action="join-channel">Открыть канал</button><button class="secondary" data-action="close-modal">Я подписался</button></div></div>');
 }
 function caseBonusHint(c) {
-  return c.free==='deposit' ? `<p class="case-bonus-hint">Подтверждённый депозит от 100 BStars даёт одно открытие. Доступно: ${state.bonuses?.depositCases || 0}.</p>` : c.free==='nickname' ? '<p class="case-bonus-hint">Добавь в имя Telegram <button class="info-link" data-action="copy-nickname">@BrainrotFreebie ⧉</button>, затем открой приложение заново.</p>' : '';
+  return c.free==='deposit' ? `<p class="case-bonus-hint">Подтверждённый депозит от 100 BStars даёт одно открытие. Доступно: ${state.bonuses?.depositCases || 0}.</p>` : c.free==='nickname' ? '<p class="case-bonus-hint">Добавь в имя Telegram <button class="info-link" data-action="copy-nickname">@BrainrotFreebie ⧉</button>, затем нажми «Открыть бесплатно».</p>' : '';
 }
 function sellAllDialog() {
   if(!state.inventory.length)return toast('Нет доступных предметов');
@@ -770,12 +779,13 @@ async function pollServer() {
         server.maintenance=false;server.locked=false;
         if(reopening){$('.bottom-nav').hidden=false;$('.balance').disabled=false;}
         adoptServerState(next);
+        refreshLiveDrops(before);
         if(reopening)render();
         if($('#mine-timer') && state.mines?.status==='active') $('#mine-timer').textContent=`До завершения: ${Math.max(0,Math.ceil((state.mines.expiresAt-server.now())/1000))}с`;
         if(before.rocket?.status==='active' && state.rocket?.status!=='active' && state.rocket?.id===before.rocket.id) rocketResult();
         const financialChanged=JSON.stringify([before.inventory,before.balance,before.gamesPaused,before.debt,before.withdrawHeldUntil,before.refundReviewPending,before.pendingInventory,before.partner,before.withdrawalOpen])!==JSON.stringify([state.inventory,state.balance,state.gamesPaused,state.debt,state.withdrawHeldUntil,state.refundReviewPending,state.pendingInventory,state.partner,state.withdrawalOpen]);
         const flightChanged=JSON.stringify([before.round?.id,before.round?.ended,before.rocket?.status,before.mines])!==JSON.stringify([state.round?.id,state.round?.ended,state.rocket?.status,state.mines]);
-        const changed=financialChanged || activeRoute==='bonuses' && JSON.stringify([before.quests,before.bonuses])!==JSON.stringify([state.quests,state.bonuses]) || activeRoute==='cases' && JSON.stringify(before.topDrop)!==JSON.stringify(state.topDrop) || ['mines','rocket','cases'].includes(activeRoute) && flightChanged;
+        const changed=(activeRoute==='cases' ? before.gamesPaused!==state.gamesPaused : financialChanged) || activeRoute==='bonuses' && JSON.stringify([before.quests,before.bonuses])!==JSON.stringify([state.quests,state.bonuses]) || ['mines','rocket'].includes(activeRoute) && flightChanged;
         const adminChanged=activeRoute==='admin' && JSON.stringify([before.payments,before.transfers,before.promos,before.bonusSpentToday,before.maintenance])!==JSON.stringify([state.payments,state.transfers,state.promos,state.bonusSpentToday,state.maintenance]);
         if((changed || adminChanged) && !$('#modal').open) {
           const values=[...document.querySelectorAll('#main input')].filter(i=>i.name && i.form?.id).map(i=>({form:i.form.id,name:i.name,value:i.value}));

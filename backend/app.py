@@ -207,7 +207,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',version='1.6.4',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',version='1.6.5',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -292,6 +292,16 @@ async def action(action: str, request: Request, authorization: str=Header(defaul
     if not isinstance(body,dict):
         raise ValueError('Ожидается объект')
     body.pop('_subscribed',None)
+    if action=='case' and body.get('caseId')=='nickname':
+        chat=await telegram('getChat',dict(chat_id=uid))
+        if chat.get('id')!=uid or chat.get('type')!='private':
+            raise ValueError('Не удалось проверить имя Telegram. Открой бота и попробуй снова.')
+        with service.store.tx() as db:
+            row,_=load_user(db,uid)
+            profile=json.loads(row['profile'])
+            for field in ('first_name','last_name','username'):
+                profile[field]=chat.get(field) or ''
+            db.execute('UPDATE users SET profile=? WHERE id=?',(json.dumps(profile),uid))
     if action=='case' and body.get('caseId')=='subscribe':
         member=await telegram('getChatMember',dict(chat_id=CHANNEL,user_id=uid))
         body['_subscribed']=member.get('status') in ('creator','administrator','member') or member.get('status')=='restricted' and member.get('is_member') is True
