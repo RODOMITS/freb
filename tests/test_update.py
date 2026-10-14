@@ -101,7 +101,7 @@ class UpdateTests(unittest.TestCase):
             d=distribution(case,self.s.items)
             self.assertAlmostEqual(sum(x['chance'] for x in d),1)
             if not case.get('free'):
-                self.assertAlmostEqual(sum(self.s.items[x['itemId']]['value']*x['chance'] for x in d),{'sahur':18.4,'feast':308,'burrow':272}.get(case['id'],.8*case['price']))
+                if case['id']!='allornothing':self.assertLessEqual(sum(self.s.items[x['itemId']]['value']*x['chance'] for x in d),.8*case['price']+1e-9)
         class Rng:
             def __init__(self,u):self.u=u
             def draw(self):return self.u

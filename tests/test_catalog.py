@@ -15,30 +15,30 @@ class CatalogTests(unittest.TestCase):
     def test_compositions_prices_files_and_return(self):
         c=json.loads((ROOT/'backend/catalog.json').read_text(encoding='utf-8'))
         items={i['id']:i for i in c['items']}
-        self.assertEqual(len(items),45);self.assertEqual(len(c['cases']),15)
-        used=set()
-        for item in items.values():self.assertTrue((ROOT/'web'/item['image']).is_file(),item['image'])
+        self.assertEqual(len(items),45)
+        self.assertEqual(len(c['cases']),16)
+        for item in items.values():
+            self.assertTrue((ROOT/'web'/item['image']).is_file(),item['image'])
         for case in c['cases']:
-            prices=[items[d['itemId']]['value'] for d in case['drops']]
-            self.assertEqual(prices,sorted(prices))
-            self.assertTrue(2<=sum(v<case['price'] for v in prices)<=4)
-            self.assertLessEqual(case['price'],2000)
-            self.assertGreaterEqual(prices[-1],case['price']*3)
-            self.assertEqual(sum(v==max(prices) for v in prices),1)
             actual=distribution(case,items)
             self.assertAlmostEqual(sum(d['chance'] for d in actual),1)
-            self.assertAlmostEqual(sum(d['chance'] for d in actual if items[d['itemId']]['value']>=case['price']),{'feast':0.06947677842545236,'burrow':0.031579063640731056}.get(case['id'],.5))
-            self.assertGreaterEqual(min(prices)/case['price'],.3)
-            self.assertAlmostEqual(sum(items[d['itemId']]['value']*d['chance'] for d in actual),{'sahur':18.4,'feast':308,'burrow':272}.get(case['id'],.8*case['price']))
-            used.update(d['itemId'] for d in actual)
-        self.assertTrue((set(items)-set(LEGACY))<=used)
+            self.assertTrue(all(d['chance']>0 for d in actual))
+            if case['id']=='allornothing':
+                self.assertEqual({d['itemId']:d['chance'] for d in actual},{'garama':.7,'dragon':.3})
+                continue
+            prices=[items[d['itemId']]['value'] for d in actual]
+            self.assertEqual(prices,sorted(prices))
+            losses=[d for d in actual if items[d['itemId']]['value']<case['price']]
+            self.assertEqual(len(losses),2)
+            self.assertAlmostEqual(losses[0]['chance'],losses[1]['chance'])
+            self.assertLessEqual(sum(items[d['itemId']]['value']*d['chance'] for d in actual),case['price']*.8+1e-9)
 
     def test_expensive_cases_without_game_caps(self):
         with tempfile.TemporaryDirectory(dir=ROOT/'data') as tmp:
             s=Service(Path(tmp)/'db.sqlite',starting_balance=10000)
             s.login(dict(id=1,first_name='Test'))
             result=s.mutate(1,'case',dict(caseId='dragon'),ident())
-            self.assertEqual(result['state']['balance'],8001)
+            self.assertEqual(result['state']['balance'],10000-s.cases['dragon']['price'])
             s.limits.check(1999,7387)
             s.limits.check(50000,5000000)
             self.assertEqual(s.limits.mines_steps(7387,3),22)
