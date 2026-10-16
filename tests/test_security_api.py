@@ -118,3 +118,20 @@ class SecurityApiTests(unittest.IsolatedAsyncioTestCase):
             response=await self.client.post('/webhook',headers=self.hook,json=dict(update_id=333,pre_checkout_query={'id':'checkout-333','from':dict(id=200), 'invoice_payload':invoice_id,'currency':'XTR','total_amount':100}))
         self.assertEqual(response.status_code,200)
         self.assertFalse(mocked.call_args.args[1]['ok'])
+
+
+    async def test_broadcast_webhook_requires_admin_and_confirmation(self):
+        def message(update_id,uid,text):
+            return dict(update_id=update_id,message={'from':dict(id=uid),'chat':dict(id=uid,type='private'),'text':text})
+        await self.client.post('/webhook',headers=self.hook,json=message(410,200,'/broadcast nope'))
+        with self.s.store.read() as db:self.assertEqual(db.execute('SELECT count(*) FROM broadcasts').fetchone()[0],0)
+        await self.client.post('/webhook',headers=self.hook,json=message(411,100,'/broadcast обновление приложения'))
+        with self.s.store.read() as db:job=dict(db.execute('SELECT * FROM broadcasts').fetchone())
+        self.assertEqual(job['status'],'draft')
+        mocked=AsyncMock(return_value=True)
+        with patch.object(self.api,'telegram',mocked):
+            for update_id,uid in [(412,200),(413,100),(413,100)]:
+                callback=dict(update_id=update_id,callback_query={'id':str(update_id),'from':dict(id=uid),'message':dict(chat=dict(id=uid,type='private')),'data':'bc:send:'+job['id']})
+                self.assertEqual((await self.client.post('/webhook',headers=self.hook,json=callback)).status_code,200)
+        with self.s.store.read() as db:self.assertEqual(db.execute('SELECT status FROM broadcasts WHERE id=?',(job['id'],)).fetchone()[0],'queued')
+        self.assertTrue(all(call.args[0]=='answerCallbackQuery' for call in mocked.call_args_list))

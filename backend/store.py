@@ -116,7 +116,14 @@ CREATE INDEX IF NOT EXISTS operations_quests ON operations(user_id,coalesce(comp
 """)
             db.execute("INSERT OR IGNORE INTO partners(user_id,code) SELECT id,'u'||id FROM users")
             db.execute('INSERT OR IGNORE INTO referral_codes(code,user_id) SELECT code,user_id FROM partners')
-            db.execute('PRAGMA user_version=12')
+            db.executescript("""
+CREATE TABLE IF NOT EXISTS bot_contacts(user_id INTEGER PRIMARY KEY,subscribed INTEGER NOT NULL DEFAULT 1,reachable INTEGER NOT NULL DEFAULT 1,updated REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS broadcasts(id TEXT PRIMARY KEY,actor INTEGER NOT NULL,text TEXT NOT NULL,status TEXT NOT NULL,created REAL NOT NULL,expires REAL NOT NULL,paused_until REAL NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS broadcast_deliveries(broadcast_id TEXT NOT NULL,user_id INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',attempts INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(broadcast_id,user_id));
+CREATE INDEX IF NOT EXISTS broadcast_pending ON broadcast_deliveries(broadcast_id,status,user_id);
+""")
+            db.execute('INSERT OR IGNORE INTO bot_contacts(user_id,updated) SELECT id,0 FROM users WHERE id>0')
+            db.execute('PRAGMA user_version=13')
 
 
     def backup(self, directory):
