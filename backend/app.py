@@ -25,6 +25,7 @@ from .service import Service, ident, integer
 from .store import load_user, save_user
 from .risk import Limits
 from .security import BoundedRateLimiter, RateLimited, SecurityMiddleware
+from .broadcast import Broadcaster
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB_ROOT = ROOT/'web' if (ROOT/'web').exists() else ROOT
@@ -57,11 +58,44 @@ async def telegram(method, data):
                 response=await client.post(f'https://api.telegram.org/bot{BOT_TOKEN}/{method}',json=data)
         result=response.json()
         if not result.get('ok'):
-            raise HTTPException(502,'Telegram временно отклонил запрос')
+            error=HTTPException(502,'Telegram временно отклонил запрос')
+            error.telegram_code=result.get('error_code')
+            wait=result.get('parameters',{}).get('retry_after')
+            error.retry_after=max(1,wait) if type(wait) is int else None
+            raise error
         return result['result']
     except (httpx.HTTPError,ValueError):
         # Never log request URLs: they contain the bot token.
         raise HTTPException(502,'Telegram недоступен. Попробуй позже.')
+
+
+def broadcasts():
+    if not hasattr(service,'broadcaster'):
+        service.broadcaster=Broadcaster(service.store,service.admins)
+    return service.broadcaster
+
+
+async def broadcast_worker():
+    sender=broadcasts()
+    await asyncio.to_thread(sender.recover)
+    while True:
+        item=None
+        try:
+            if BOT_TOKEN:
+                item=await asyncio.to_thread(sender.claim)
+                if item:
+                    try:
+                        await telegram('sendMessage',dict(chat_id=item['userId'],text=item['text']))
+                    except HTTPException as error:
+                        await asyncio.to_thread(sender.finish,item,getattr(error,'telegram_code',0),getattr(error,'retry_after',None))
+                    else:
+                        await asyncio.to_thread(sender.finish,item)
+        except Exception:
+            if item:
+                try: await asyncio.to_thread(sender.finish,item,0)
+                except Exception: pass
+            log.error('Broadcast worker failed; will retry',exc_info=True)
+        await asyncio.sleep(.1 if item else 1)
 
 
 async def scheduler():
@@ -111,7 +145,7 @@ async def configure_telegram():
     while True:
         try:
             BOT_USERNAME=(await telegram('getMe',{}))['username']
-            await telegram('setWebhook',dict(url=PUBLIC_URL+'/webhook',secret_token=WEBHOOK_SECRET,allowed_updates=['message','pre_checkout_query'],drop_pending_updates=False))
+            await telegram('setWebhook',dict(url=PUBLIC_URL+'/webhook',secret_token=WEBHOOK_SECRET,allowed_updates=['message','pre_checkout_query','callback_query'],drop_pending_updates=False))
             await telegram('setChatMenuButton',dict(menu_button=dict(type='web_app',text='Открыть Freebie',web_app=dict(url=PUBLIC_URL))))
             log.info('Telegram webhook and menu configured')
             return
@@ -128,11 +162,17 @@ async def lifespan(app):
     task=asyncio.create_task(scheduler())
     notifications=asyncio.create_task(notify_outbox())
     backup_task=asyncio.create_task(backups())
+    broadcast_task=asyncio.create_task(broadcast_worker())
     yield
     task.cancel()
     notifications.cancel()
     backup_task.cancel()
     setup_task.cancel()
+    broadcast_task.cancel()
+    try:
+        await broadcast_task
+    except asyncio.CancelledError:
+        pass
     try:
         await task
     except asyncio.CancelledError:
@@ -222,7 +262,7 @@ def health():
 
 @app.get('/runtime-config')
 def runtime_config():
-    return dict(mode='server',version='1.7.0',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
+    return dict(mode='server',version='1.7.1',depositIds=service.deposit_ids,newsUrl='https://t.me/brainrotFreebie',botUsername=BOT_USERNAME,ownerUrl=f'https://t.me/{OWNER_USERNAME}',paymentsEnabled=PAYMENTS,termsUrl=TERMS_URL,privacyUrl=PRIVACY_URL,starsRate=1.5,starsHoldHours=service.limits.stars_hold_hours)
 
 
 @app.get('/api/admin/backup')
@@ -401,6 +441,13 @@ async def webhook(request: Request,x_telegram_bot_api_secret_token: str=Header(d
             if ok and row['status']=='pending':
                 db.execute('UPDATE invoices SET status=?,checkout=? WHERE id=?',('processing',query['id'],row['id']))
         await telegram('answerPreCheckoutQuery',dict(pre_checkout_query_id=query['id'],ok=ok,**({} if ok else dict(error_message='Счёт недоступен. Создай новый.'))))
+        return dict(ok=True)
+    outcome=await asyncio.to_thread(broadcasts().handle,update)
+    if outcome['handled']:
+        if outcome.get('callbackId'):
+            try:
+                await telegram('answerCallbackQuery',dict(callback_query_id=outcome['callbackId'],text=outcome.get('answer',''),show_alert=False))
+            except HTTPException: pass
         return dict(ok=True)
     message=update.get('message',{})
     payment=message.get('successful_payment')
